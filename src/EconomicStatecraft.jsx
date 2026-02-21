@@ -2,6 +2,86 @@ import { useState, useEffect } from "react";
 
 // ─── GAME CONSTANTS ──────────────────────────────────────────────────────────
 
+// ─── AI PERSONALITIES ─────────────────────────────────────────────────────────
+const AI_PERSONALITIES = {
+  usa: {
+    name: "Americana",
+    archetype: "Hegemon",
+    tariffProb:    0.10, // low — prefers multilateral rules
+    currWarProb:   0.05,
+    ftaPoachProb:  0.30, // high — signs FTAs everywhere
+    coalitionProb: 0.25,
+    retaliationMult: 1.0, // proportional
+    forgiveRate:   0.97, // relations drift fast toward neutral
+    tooltip: "Prefers rules-based order. Low direct aggression but aggressively builds trade blocs.",
+  },
+  china: {
+    name: "Sinica",
+    archetype: "Rising Power",
+    tariffProb:    0.40, // very high aggression
+    currWarProb:   0.08,
+    ftaPoachProb:  0.20,
+    coalitionProb: 0.15,
+    retaliationMult: 1.5, // escalates beyond tit-for-tat
+    forgiveRate:   0.90, // holds grudges
+    tooltip: "Highly aggressive on tariffs. Never backs down. Holds long grudges.",
+  },
+  eu: {
+    name: "Eurozone",
+    archetype: "Diplomatic Bloc",
+    tariffProb:    0.08, // very low
+    currWarProb:   0.04,
+    ftaPoachProb:  0.15,
+    coalitionProb: 0.45, // very high — punishes sanctions with coalitions
+    retaliationMult: 0.7, // de-escalates
+    forgiveRate:   0.98, // fast forgiveness
+    tooltip: "Rarely aggressive but leads coalitions against sanctioners. Rewards diplomacy.",
+  },
+  em: {
+    name: "Meridian",
+    archetype: "Volatile Market",
+    tariffProb:    0.20,
+    currWarProb:   0.22, // high — currency instability
+    ftaPoachProb:  0.12,
+    coalitionProb: 0.10,
+    retaliationMult: 0.8,
+    forgiveRate:   0.99, // easily bought off
+    tooltip: "Volatile currency policies. Easy to pacify with diplomacy or investment.",
+  },
+};
+
+// ─── DIFFICULTY SETTINGS ─────────────────────────────────────────────────────
+const DIFFICULTIES = {
+  diplomat: {
+    label: "DIPLOMAT",
+    desc: "Reduced AI aggression, bonus starting relations, 3 actions/turn.",
+    color: "#7fe87f",
+    actionsPerTurn: 3,
+    relationsBonus: 20,
+    shockMult: 0.7,
+    aiAggrMult: 0.5,
+  },
+  strategist: {
+    label: "STRATEGIST",
+    desc: "Standard conditions. 2 actions/turn.",
+    color: "#e2c97e",
+    actionsPerTurn: 2,
+    relationsBonus: 0,
+    shockMult: 1.0,
+    aiAggrMult: 1.0,
+  },
+  hardliner: {
+    label: "HARDLINER",
+    desc: "AI is more aggressive. Shocks are severe. Relations start cold.",
+    color: "#e87f7f",
+    actionsPerTurn: 2,
+    relationsBonus: -15,
+    shockMult: 1.5,
+    aiAggrMult: 1.8,
+  },
+};
+
+
 const TOTAL_TURNS = 8;
 
 // Export supply elasticities per country (for optimal tariff calc t* = 1/(ε-1))
@@ -76,6 +156,8 @@ const POLICY_ACTIONS = [
       s.home.welfare = Math.round(s.home.welfare * 1.04);
       s.home.ToT = Math.min(3, s.home.ToT * 1.05);
       s.ftaPartners = [...(s.ftaPartners || []), target];
+      if (!s.stability) s.stability = {};
+      s.stability[target] = 3; // stability bonus for 3 turns
       s.log.push({ turn: state.turn, type: "policy", text: `✅ FTA signed with ${COUNTRIES[target].name}. Trade volume +30%, 4% welfare gain, relations improved.` });
       // AI reacts positively
       s.countries[target].relations_to_home = Math.min(100, s.countries[target].relations_to_home + 15);
@@ -103,6 +185,8 @@ const POLICY_ACTIONS = [
         s.log.push({ turn: state.turn, type: "event", text: `⚠️ ${COUNTRIES[target].name} retaliates with counter-tariffs. Additional welfare loss.` });
       }
       s.log.push({ turn: state.turn, type: "policy", text: `🚧 Tariff imposed on ${COUNTRIES[target].name}. Trade -30%, welfare -3%, relations deteriorated.` });
+      if (!s.hostility) s.hostility = {};
+      s.hostility[target] = Math.max(s.hostility[target] || 0, 2); // linger 2 turns
       s.countries[target].relations_to_home = Math.max(-100, s.countries[target].relations_to_home - 20);
       return s;
     },
@@ -133,6 +217,8 @@ const POLICY_ACTIONS = [
         }
       });
       s.log.push({ turn: state.turn, type: "policy", text: `🔒 Sanctions imposed on ${COUNTRIES[target].name}. Trade severed, -5% welfare, target economy damaged.` });
+      if (!s.sanctionHistory) s.sanctionHistory = [];
+      if (!s.sanctionHistory.includes(target)) s.sanctionHistory.push(target); // persists
       return s;
     },
   },
@@ -279,36 +365,56 @@ function rollShock() {
 function applyAITurns(state) {
   const s = deepClone(state);
   const newCrises = [];
+  const diff = DIFFICULTIES[s.difficulty || "strategist"];
+  const aggrMult = diff.aiAggrMult;
+
+  // Decay multi-turn hostility counters
+  if (!s.hostility) s.hostility = {};
+  if (!s.stability) s.stability = {};
+  if (!s.sanctionHistory) s.sanctionHistory = [];
+  Object.keys(s.hostility).forEach(c => { s.hostility[c] = Math.max(0, s.hostility[c] - 1); });
+  Object.keys(s.stability).forEach(c => { s.stability[c] = Math.max(0, s.stability[c] - 1); });
 
   Object.keys(s.countries).forEach(c => {
+    const p = AI_PERSONALITIES[c];
     // AI growth
     s.countries[c].gdp = Math.round(s.countries[c].gdp * (1 + Math.random() * 0.03));
     s.countries[c].welfare = Math.round(s.countries[c].welfare * (1 + (Math.random() - 0.3) * 0.02));
-    s.relations[c] = Math.round(s.relations[c] * 0.95); // drift toward neutral
+    s.relations[c] = Math.round(s.relations[c] * p.forgiveRate); // drift per personality
 
     const rel = s.relations[c];
+    // Multi-turn hostility boost: lingering anger from past tariffs/sanctions
+    const hostilityBoost = (s.hostility[c] || 0) * 0.12;
+    // Stability dampener: active FTA reduces crisis probability
+    const stabilityDamp = s.stability[c] ? 0.4 : 1.0;
 
-    // ── AI TARIFF: if relations < -10, 25% chance they tariff you ──
-    const tariffCount = (s.log || []).filter(l => l.text.includes('imposed tariffs on Cascadia')).length;
-    if (rel < -10 && Math.random() < 0.25 && tariffCount < 3) {
+    // ── AI TARIFF (personality-weighted) ──
+    const tariffCount = (s.log || []).filter(l => l.text.includes(`${COUNTRIES[c].name} imposed tariffs`)).length;
+    const tariffProb = (p.tariffProb + hostilityBoost) * aggrMult * stabilityDamp;
+    if (rel < -10 && Math.random() < tariffProb && tariffCount < 4) {
       const eps = ELASTICITIES[c];
       const optTariff = 1 / (eps - 1);
+      // Sinica escalates above t*, others use t*
+      const effectiveTariff = p.retaliationMult > 1.2 ? optTariff * p.retaliationMult : optTariff;
       newCrises.push({
         id: `tariff_${c}_${s.turn}`,
         type: "ai_tariff",
         country: c,
         epsilon: eps,
         optimalTariff: optTariff,
-        text: `${COUNTRIES[c].flag} ${COUNTRIES[c].name} has imposed a tariff on Cascadian exports. Their export supply elasticity ε=${eps.toFixed(1)}. Your optimal retaliation rate t*=1/(ε-1)=${(optTariff*100).toFixed(0)}%.`,
+        personality: p.archetype,
+        text: `${COUNTRIES[c].flag} ${COUNTRIES[c].name} [${p.archetype}] has imposed a tariff on Cascadian exports. ε=${eps.toFixed(1)}, t*=${(optTariff*100).toFixed(0)}%.${p.retaliationMult > 1.2 ? " ⚠ They are escalating ABOVE the optimal rate." : ""}`,
         resolved: false,
       });
       s.home.welfare = Math.round(s.home.welfare * 0.97);
       s.home.ToT = Math.max(0.2, s.home.ToT * 0.95);
-      s.log.push({ turn: s.turn, type: "event", text: `⚠️ ${COUNTRIES[c].name} imposed tariffs on Cascadia. Welfare -3%, ToT deteriorated.` });
+      s.hostility[c] = Math.max(s.hostility[c] || 0, 2); // linger 2 turns
+      s.log.push({ turn: s.turn, type: "event", text: `⚠️ ${COUNTRIES[c].name} [${p.archetype}] imposed tariffs on Cascadia. Welfare -3%.` });
     }
 
-    // ── CURRENCY WAR: if no FTA and country depreciates, 25% chance ──
-    if (!s.ftaPartners?.includes(c) && Math.random() < 0.10 && rel < 0) {
+    // ── CURRENCY WAR (personality-weighted) ──
+    const currProb = p.currWarProb * aggrMult * stabilityDamp;
+    if (!s.ftaPartners?.includes(c) && Math.random() < currProb && rel < 0) {
       s.countries[c].ToT = Math.min(3, s.countries[c].ToT * 1.1);
       s.home.ToT = Math.max(0.2, s.home.ToT * 0.94);
       s.home.welfare = Math.round(s.home.welfare * 0.98);
@@ -316,38 +422,47 @@ function applyAITurns(state) {
         id: `currwar_${c}_${s.turn}`,
         type: "currency_war",
         country: c,
-        text: `${COUNTRIES[c].flag} ${COUNTRIES[c].name} has depreciated their currency, gaining export competitiveness at your expense. Your ToT fell. Counter-depreciate or absorb the loss?`,
+        personality: p.archetype,
+        text: `${COUNTRIES[c].flag} ${COUNTRIES[c].name} [${p.archetype}] has depreciated their currency. Your ToT fell. ${c === "em" ? "Meridian's volatile FX policy strikes again." : ""}`,
         resolved: false,
       });
-      s.log.push({ turn: s.turn, type: "event", text: `💱 ${COUNTRIES[c].name} currency depreciation hurt Cascadian ToT. Welfare -2%.` });
+      s.log.push({ turn: s.turn, type: "event", text: `💱 ${COUNTRIES[c].name} currency war. Welfare -2%.` });
     }
 
-    // ── FTA POACHING: rival signs FTA with one of your allies ──
-    if (Math.random() < 0.18 && rel < 20) {
+    // ── FTA POACHING (personality-weighted, Americana speciality) ──
+    const poachProb = p.ftaPoachProb * aggrMult;
+    if (Math.random() < poachProb && rel < 20) {
       const allies = Object.keys(s.relations).filter(x => x !== c && s.relations[x] > 40);
       if (allies.length > 0) {
         const ally = allies[Math.floor(Math.random() * allies.length)];
         const tradeLost = Math.round(s.trade[ally] * 0.15);
         s.trade[ally] = Math.max(0, s.trade[ally] - tradeLost);
         s.home.welfare = Math.round(s.home.welfare * 0.985);
-        s.log.push({ turn: s.turn, type: "event", text: `📉 Trade diversion: ${COUNTRIES[c].name} signed an FTA with ${COUNTRIES[ally].name}. Your trade with ${COUNTRIES[ally].name} diverted by ${tradeLost} units (Viner trade diversion). Welfare -1.5%.` });
+        s.log.push({ turn: s.turn, type: "event", text: `📉 Trade diversion: ${COUNTRIES[c].name} signed FTA with ${COUNTRIES[ally].name}. Viner diversion cost: -${tradeLost} trade units.` });
       }
     }
   });
 
-  // ── SANCTIONS COALITION: if you sanctioned someone and their ally is angry ──
-  const sanctioned = Object.keys(s.trade).filter(c => s.trade[c] === 0);
+  // ── SANCTIONS COALITION (Eurozone leads, personality-weighted) ──
+  const sanctioned = [...new Set([
+    ...Object.keys(s.trade).filter(c => s.trade[c] === 0),
+    ...s.sanctionHistory
+  ])];
   if (sanctioned.length > 0) {
     Object.keys(s.relations).forEach(c => {
-      if (!sanctioned.includes(c) && s.countries[c].relations_to_home < -20 && Math.random() < 0.4) {
+      const p = AI_PERSONALITIES[c];
+      const coalProb = p.coalitionProb * aggrMult;
+      const alreadyCoalesced = (s.log || []).filter(l => l.text.includes(`${COUNTRIES[c].name} joined a sanctions coalition`) && l.turn >= s.turn - 1).length > 0;
+      if (!sanctioned.includes(c) && s.relations[c] < -10 && Math.random() < coalProb && !alreadyCoalesced) {
         s.home.welfare = Math.round(s.home.welfare * 0.96);
         s.home.gdp = Math.round(s.home.gdp * 0.97);
-        s.log.push({ turn: s.turn, type: "event", text: `🔗 Sanctions coalition: ${COUNTRIES[c].name} joined sanctions against Cascadia in solidarity with ${sanctioned.map(x => COUNTRIES[x].name).join(", ")}. GDP -3%, welfare -4%.` });
+        s.log.push({ turn: s.turn, type: "event", text: `🔗 ${COUNTRIES[c].name} [${AI_PERSONALITIES[c].archetype}] joined sanctions coalition. Welfare -4%, GDP -3%.` });
         newCrises.push({
           id: `coalition_${c}_${s.turn}`,
           type: "sanctions_coalition",
           country: c,
-          text: `${COUNTRIES[c].flag} ${COUNTRIES[c].name} has joined a sanctions coalition against Cascadia. Offer diplomacy to break the coalition, or retaliate?`,
+          personality: AI_PERSONALITIES[c].archetype,
+          text: `${COUNTRIES[c].flag} ${COUNTRIES[c].name} [${AI_PERSONALITIES[c].archetype}] joined a sanctions coalition. ${c === "eu" ? "The Eurozone is mobilizing its full diplomatic weight." : ""}`,
           resolved: false,
         });
       }
@@ -393,25 +508,51 @@ function Card({ title, children, accent = C.blue, style = {} }) {
 // ─── SCREENS ─────────────────────────────────────────────────────────────────
 
 function IntroScreen({ onStart }) {
+  const [difficulty, setDifficulty] = useState("strategist");
+  const diff = DIFFICULTIES[difficulty];
   return (
     <div style={{ minHeight: "80vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem", textAlign: "center" }}>
       <div style={{ fontFamily: mono, fontSize: "0.65rem", letterSpacing: "0.2em", color: C.dim, marginBottom: "1rem" }}>CLASSIFIED — ECONOMIC INTELLIGENCE DIVISION</div>
       <div style={{ fontSize: "2.5rem", fontWeight: 300, color: C.gold, letterSpacing: "0.08em", marginBottom: "0.5rem", fontFamily: mono }}>STATECRAFT</div>
       <div style={{ fontFamily: mono, fontSize: "0.75rem", color: C.dim, marginBottom: "2rem", letterSpacing: "0.1em" }}>ECONOMIC STRATEGY SIMULATION // v1.0</div>
-      <div style={{ maxWidth: 520, fontSize: "0.82rem", color: "#8a9bb0", lineHeight: 1.8, marginBottom: "2.5rem", fontFamily: mono }}>
+      <div style={{ maxWidth: 520, fontSize: "0.82rem", color: "#8a9bb0", lineHeight: 1.8, marginBottom: "2rem", fontFamily: mono }}>
         You are the Minister of Trade for <span style={{ color: C.gold }}>Cascadia</span> — a mid-sized open economy navigating a multipolar world. Over 8 turns, make trade and industrial policy decisions grounded in real economic models. Each action has model-derived consequences. Your goal: maximize national welfare.
         <br /><br />
         <span style={{ color: "#5a7a9a" }}>Powered by Ricardian, H-O, Standard Trade, Krugman & Melitz models.</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: "0.8rem", marginBottom: "2.5rem", maxWidth: 600 }}>
-        {Object.entries(COUNTRIES).filter(([k]) => k !== "home").map(([k, c]) => (
-          <div key={k} style={{ background: C.panel, border: `1px solid ${C.border}`, padding: "0.6rem", borderRadius: "2px", fontFamily: mono }}>
-            <div style={{ fontSize: "1.2rem", marginBottom: "0.2rem" }}>{c.flag}</div>
-            <div style={{ fontSize: "0.62rem", color: c.color }}>{c.name}</div>
+
+      {/* Country roster */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.6rem", marginBottom: "2rem", maxWidth: 560 }}>
+        {Object.entries(AI_PERSONALITIES).map(([k, p]) => (
+          <div key={k} style={{ background: C.panel, border: `1px solid ${COUNTRIES[k].color}44`, padding: "0.7rem 0.5rem", borderRadius: "2px", fontFamily: mono }}>
+            <div style={{ fontSize: "1.1rem", marginBottom: "0.2rem" }}>{COUNTRIES[k].flag}</div>
+            <div style={{ fontSize: "0.62rem", color: COUNTRIES[k].color, fontWeight: 600 }}>{p.name}</div>
+            <div style={{ fontSize: "0.55rem", color: C.dim, marginTop: "0.2rem" }}>{p.archetype}</div>
+            <div style={{ fontSize: "0.55rem", color: "#3a5a6a", marginTop: "0.3rem", lineHeight: 1.4 }}>{p.tooltip}</div>
           </div>
         ))}
       </div>
-      <button onClick={onStart} style={{
+
+      {/* Difficulty selector */}
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: C.dim, letterSpacing: "0.1em", marginBottom: "0.7rem" }}>SELECT DIFFICULTY</div>
+      <div style={{ display: "flex", gap: "0.8rem", marginBottom: "0.6rem" }}>
+        {Object.entries(DIFFICULTIES).map(([k, d]) => (
+          <button key={k} onClick={() => setDifficulty(k)} style={{
+            fontFamily: mono, fontSize: "0.68rem", letterSpacing: "0.08em",
+            padding: "0.5rem 1.2rem", borderRadius: "2px", cursor: "pointer",
+            background: difficulty === k ? `${d.color}22` : "none",
+            border: `1px solid ${difficulty === k ? d.color : C.border}`,
+            color: difficulty === k ? d.color : C.dim,
+            transition: "all 0.15s",
+          }}>{d.label}</button>
+        ))}
+      </div>
+      <div style={{ fontFamily: mono, fontSize: "0.65rem", color: diff.color, marginBottom: "0.4rem" }}>{diff.desc}</div>
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: C.dim, marginBottom: "2rem" }}>
+        {diff.actionsPerTurn} actions/turn · Relations {diff.relationsBonus >= 0 ? "+" : ""}{diff.relationsBonus} · Shock ×{diff.shockMult} · AI ×{diff.aiAggrMult}
+      </div>
+
+      <button onClick={() => onStart(difficulty)} style={{
         background: "none", border: `1px solid ${C.gold}`, color: C.gold,
         fontFamily: mono, fontSize: "0.75rem", letterSpacing: "0.12em",
         padding: "0.8rem 2.5rem", cursor: "pointer", borderRadius: "2px",
@@ -1167,7 +1308,7 @@ export default function EconomicStatecraft() {
     const shock = rollShock();
     s.shock = shock;
     s = shock.effect(s);
-    s.actionsLeft = 2;
+    s.actionsLeft = DIFFICULTIES[s.difficulty || 'strategist'].actionsPerTurn;
     s.phase = "brief";
     setState(s);
   };
@@ -1176,7 +1317,7 @@ export default function EconomicStatecraft() {
     return (
       <div style={{ background: C.bg, minHeight: "100vh", color: C.text }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap'); * { box-sizing: border-box; } ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: ${C.bg}; } ::-webkit-scrollbar-thumb { background: #2a3a4a; }`}</style>
-        <IntroScreen onStart={initGame} />
+        <IntroScreen onStart={(diff) => initGame(diff)} />
       </div>
     );
   }
