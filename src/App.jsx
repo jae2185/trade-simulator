@@ -303,14 +303,32 @@ function StandardModel() {
   const autX = findTangent(1.0);
   const autY = ppf(autX);
 
-  const consX = prodX * 0.72;
-  const consY = prodY + (prodX - consX) * p.ToT;
+  // Autarky income (at autarky prices, normalized so P_Y=1, P_X=autarky slope=1)
+  const autarkyIncome = autX * 1.0 + autY;
+  // Trade income at trade prices (P_X = ToT, P_Y = 1)
+  const tradeIncome = prodX * p.ToT + prodY;
+
+  // Production gain: extra income from reallocation at trade prices vs autarky production
+  // = value of trade production - value of autarky production, both at trade prices
+  const autarkyAtTradePrices = autX * p.ToT + autY;
+  const prodGain = Math.max(0, tradeIncome - autarkyAtTradePrices);
+
+  // Consumption: on the trade budget line. Assume Cobb-Douglas preferences (equal shares)
+  // With C-D: spend half income on each good
+  const consX = (tradeIncome / 2) / p.ToT;
+  const consY = tradeIncome / 2;
   const exports_ = Math.max(0, prodX - consX);
   const imports_ = Math.max(0, consY - prodY);
 
-  const prodGainArea = 0.5 * Math.abs(prodX - autX) * Math.abs(prodY - autY);
-  const exchGainArea = 0.5 * exports_ * imports_;
-  const totalGain = prodGainArea + exchGainArea;
+  // Exchange gain: the triangle area between the trade budget line and autarky budget line
+  // at the consumption point. ≈ 0.5 * exports * (ToT - autarkyToT) in price space
+  // Simpler economically correct version: gain in utility from exchange
+  // Use: exchange gain = 0.5 * |ΔP| * exports, where ΔP = ToT - 1
+  const exchGain = Math.max(0, 0.5 * Math.abs(p.ToT - 1.0) * exports_);
+
+  // Total welfare gain as % of autarky income
+  const totalGain = prodGain + exchGain;
+  const welfareGainPct = ((totalGain / autarkyAtTradePrices) * 100);
 
   const nPts = 80;
   const ppfPoints = Array.from({ length: nPts + 1 }, (_, i) => ({ x: (i / nPts) * p.size, y: ppf((i / nPts) * p.size) }));
@@ -345,14 +363,15 @@ function StandardModel() {
             <Stat label="Imports (Good Y)" value={imports_.toFixed(1)} />
           </div>
           <div style={{ height: "0.6rem" }} />
-          <div style={{ fontSize: "0.65rem", color: "#4a7fa5", letterSpacing: "0.08em", marginBottom: "0.6rem" }}>WELFARE TRIANGLES</div>
+          <div style={{ fontSize: "0.65rem", color: "#4a7fa5", letterSpacing: "0.08em", marginBottom: "0.6rem" }}>WELFARE DECOMPOSITION</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
-            <Stat label="Production gain" value={prodGainArea.toFixed(1)} />
-            <Stat label="Exchange gain" value={exchGainArea.toFixed(1)} />
-            <Stat label="Total gain from trade" value={totalGain.toFixed(1)} highlight />
+            <Stat label="Production gain (income Δ)" value={prodGain.toFixed(2)} />
+            <Stat label="Exchange gain (price Δ)" value={exchGain.toFixed(2)} />
+            <Stat label="Total gain" value={totalGain.toFixed(2)} highlight />
+            <Stat label="% of autarky income" value={`${welfareGainPct.toFixed(1)}%`} highlight />
           </div>
           <div style={{ fontSize: "0.7rem", color: "#5a7a5a", fontStyle: "italic", background: "rgba(90,160,90,0.06)", padding: "0.6rem", borderLeft: "2px solid #3a7a3a", marginTop: "0.6rem" }}>
-            {p.ToT > 1.8 ? "Highly favorable ToT: large gains from both production reallocation and exchange." : p.ToT < 0.5 ? "Adverse ToT: minimal gains. At the extreme, trade can reduce welfare below autarky." : "Moderate ToT: positive but modest gains from trade."}
+            {p.ToT > 1.8 ? "Highly favorable ToT: large production reallocation gain and exchange gain." : p.ToT < 0.6 ? "Adverse ToT: export prices are low. Production gain may offset exchange loss — welfare gain is small." : "Moderate ToT: positive gains from both specialization and exchange."}
           </div>
         </Panel>
       </div>
@@ -364,34 +383,63 @@ function StandardModel() {
               const blY0 = prodY + prodX * p.ToT;
               const blX1 = Math.min(blY0 / p.ToT, sMax);
               const blY1 = Math.max(0, blY0 - blX1 * p.ToT);
-              const triProd = [`${sx(autX)},${sy(autY)}`, `${sx(prodX)},${sy(autY)}`, `${sx(prodX)},${sy(prodY)}`].join(" ");
-              const triExch = [`${sx(prodX)},${sy(prodY)}`, `${sx(consX)},${sy(prodY)}`, `${sx(consX)},${sy(consY)}`].join(" ");
+
+              // Production gain triangle: autarky point, production point, and the
+              // corner that shows the income difference at trade prices
+              // Triangle: (autX, autY), (prodX, prodY), (autX, autY + prodGain)
+              // Simpler visual: right triangle between aut and prod points with corner at (prodX, autY)
+              const triProd = [
+                `${sx(autX)},${sy(autY)}`,
+                `${sx(prodX)},${sy(autY)}`,
+                `${sx(prodX)},${sy(prodY)}`
+              ].join(" ");
+
+              // Exchange gain triangle: between prod and cons points
+              const triExch = [
+                `${sx(prodX)},${sy(prodY)}`,
+                `${sx(consX)},${sy(prodY)}`,
+                `${sx(consX)},${sy(consY)}`
+              ].join(" ");
+
+              // Autarky budget line (slope = -1 through autarky point)
+              const autBlY0 = Math.min(autY + autX * 1.0, sMax);
+              const autBlX1 = Math.min(autBlY0, sMax);
               return (
                 <>
                   <polygon points={triProd} fill="rgba(226,201,126,0.15)" stroke="#e2c97e" strokeWidth={1} strokeDasharray="3,2" />
                   <polygon points={triExch} fill="rgba(127,232,127,0.12)" stroke="#7fe87f" strokeWidth={1} strokeDasharray="3,2" />
                   <polyline points={ppfPts} fill="none" stroke="#4a9fe8" strokeWidth={2.5} />
+                  {/* Autarky budget line (slope=-1) */}
+                  {showAutarky && (
+                    <line x1={sx(0)} y1={sy(Math.min(autY + autX, sMax))} x2={sx(Math.min(autX + autY, sMax))} y2={sy(0)}
+                      stroke="#5a6a7a" strokeWidth={1} strokeDasharray="3,3" opacity={0.5} />
+                  )}
+                  {/* Trade budget line */}
                   <line x1={sx(0)} y1={sy(Math.min(blY0, sMax))} x2={sx(blX1)} y2={sy(blY1)} stroke="#e2c97e" strokeWidth={1.5} strokeDasharray="5,3" opacity={0.8} />
                   {showAutarky && (
                     <>
                       <circle cx={sx(autX)} cy={sy(autY)} r={5} fill="#5a6a7a" stroke="#8a9bb0" strokeWidth={1} />
-                      <text x={sx(autX) - 8} y={sy(autY) - 8} fill="#8a9bb0" fontSize={8}>Autarky</text>
+                      <text x={sx(autX) + 6} y={sy(autY) - 6} fill="#8a9bb0" fontSize={8}>Autarky</text>
                     </>
                   )}
                   <circle cx={sx(prodX)} cy={sy(prodY)} r={6} fill="#e2c97e" />
-                  <text x={sx(prodX) + 8} y={sy(prodY) - 3} fill="#e2c97e" fontSize={8}>Prod.</text>
+                  <text x={sx(prodX) + 8} y={sy(prodY) + 4} fill="#e2c97e" fontSize={8}>Prod.</text>
                   <circle cx={sx(consX)} cy={sy(consY)} r={6} fill="#7fe87f" />
-                  <text x={sx(consX) - 32} y={sy(consY) - 5} fill="#7fe87f" fontSize={8}>Cons.</text>
+                  <text x={sx(consX) + 6} y={sy(consY) - 6} fill="#7fe87f" fontSize={8}>Cons.</text>
                   <line x1={sx(consX)} y1={sy(consY)} x2={sx(prodX)} y2={sy(consY)} stroke="#e87f7f" strokeWidth={1.5} opacity={0.7} />
                   <line x1={sx(prodX)} y1={sy(consY)} x2={sx(prodX)} y2={sy(prodY)} stroke="#e87f7f" strokeWidth={1.5} opacity={0.7} />
-                  <text x={sx((autX + prodX) / 2)} y={sy((autY + prodY) / 2) + 4} fill="#e2c97e" fontSize={7.5} textAnchor="middle" opacity={0.8}>Prod. gain</text>
-                  <text x={sx((prodX + consX) / 2)} y={sy((prodY + consY) / 2)} fill="#7fe87f" fontSize={7.5} textAnchor="middle" opacity={0.8}>Exch. gain</text>
+                  {prodGain > 0.5 && (
+                    <text x={sx((autX + prodX) / 2)} y={sy(Math.max(autY, prodY)) - 5} fill="#e2c97e" fontSize={7} textAnchor="middle" opacity={0.8}>Prod. gain</text>
+                  )}
+                  {exchGain > 0.5 && (
+                    <text x={sx((prodX + consX) / 2)} y={sy((prodY + consY) / 2)} fill="#7fe87f" fontSize={7} textAnchor="middle" opacity={0.8}>Exch. gain</text>
+                  )}
                 </>
               );
             }}
           </AxesChart>
           <div style={{ display: "flex", gap: "0.8rem", marginTop: "0.4rem", flexWrap: "wrap" }}>
-            {[["#4a9fe8", "PPF"], ["#e2c97e", "Price line / Prod."], ["#7fe87f", "Consumption"], ["#e87f7f", "Trade Δ"], ["rgba(226,201,126,0.5)", "Prod. gain"], ["rgba(127,232,127,0.4)", "Exch. gain"]].map(([c, l]) => (
+            {[["#4a9fe8", "PPF"], ["#e2c97e", "Trade price line"], ["#5a6a7a", "Autarky price line"], ["#7fe87f", "Consumption"], ["#e87f7f", "Trade Δ"], ["rgba(226,201,126,0.5)", "Prod. gain"], ["rgba(127,232,127,0.4)", "Exch. gain"]].map(([c, l]) => (
               <div key={l} style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.6rem", color: "#5a6a7a" }}>
                 <div style={{ width: 8, height: 8, borderRadius: "1px", background: c, border: "1px solid rgba(255,255,255,0.1)" }} />{l}
               </div>
