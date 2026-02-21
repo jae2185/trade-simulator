@@ -303,32 +303,30 @@ function StandardModel() {
   const autX = findTangent(1.0);
   const autY = ppf(autX);
 
-  // Autarky income (at autarky prices, normalized so P_Y=1, P_X=autarky slope=1)
-  const autarkyIncome = autX * 1.0 + autY;
-  // Trade income at trade prices (P_X = ToT, P_Y = 1)
+  // Income at trade prices (P_X = ToT, P_Y = 1)
   const tradeIncome = prodX * p.ToT + prodY;
-
-  // Production gain: extra income from reallocation at trade prices vs autarky production
-  // = value of trade production - value of autarky production, both at trade prices
+  // Income if stayed at autarky production point, valued at trade prices
   const autarkyAtTradePrices = autX * p.ToT + autY;
+  // Production gain: always >= 0 (revealed preference)
   const prodGain = Math.max(0, tradeIncome - autarkyAtTradePrices);
 
-  // Consumption: on the trade budget line. Assume Cobb-Douglas preferences (equal shares)
-  // With C-D: spend half income on each good
-  const consX = (tradeIncome / 2) / p.ToT;
-  const consY = tradeIncome / 2;
+  // Consumption: use biased Cobb-Douglas so Good X share = alpha, Good Y share = (1-alpha)
+  // Set alpha so that at autarky (ToT=1), C_X = autX and C_Y = autY
+  // autarky income = autX + autY, so alpha = autX / (autX + autY)
+  const autarkyIncome = autX + autY;
+  const alpha = autX / autarkyIncome; // share of income spent on X
+  const consX = (alpha * tradeIncome) / p.ToT;
+  const consY = (1 - alpha) * tradeIncome;
+
   const exports_ = Math.max(0, prodX - consX);
   const imports_ = Math.max(0, consY - prodY);
 
-  // Exchange gain: the triangle area between the trade budget line and autarky budget line
-  // at the consumption point. ≈ 0.5 * exports * (ToT - autarkyToT) in price space
-  // Simpler economically correct version: gain in utility from exchange
-  // Use: exchange gain = 0.5 * |ΔP| * exports, where ΔP = ToT - 1
+  // Exchange gain: welfare gain from being able to trade at world prices
+  // = 0.5 * exports * |ToT - 1| (area of the exchange triangle)
   const exchGain = Math.max(0, 0.5 * Math.abs(p.ToT - 1.0) * exports_);
 
-  // Total welfare gain as % of autarky income
   const totalGain = prodGain + exchGain;
-  const welfareGainPct = ((totalGain / autarkyAtTradePrices) * 100);
+  const welfareGainPct = (totalGain / autarkyAtTradePrices) * 100;
 
   const nPts = 80;
   const ppfPoints = Array.from({ length: nPts + 1 }, (_, i) => ({ x: (i / nPts) * p.size, y: ppf((i / nPts) * p.size) }));
