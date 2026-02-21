@@ -72,7 +72,7 @@ const POLICY_ACTIONS = [
       s.relations[target] = Math.min(100, s.relations[target] + 20);
       s.trade[target] = Math.round(s.trade[target] * 1.3);
       // Krugman: more varieties, lower prices
-      s.home.varieties = Math.round(s.home.varieties * 1.15);
+      s.home.varieties = Math.max(3, Math.round(s.home.varieties * 1.15));
       s.home.welfare = Math.round(s.home.welfare * 1.04);
       s.home.ToT = Math.min(3, s.home.ToT * 1.05);
       s.ftaPartners = [...(s.ftaPartners || []), target];
@@ -178,7 +178,7 @@ const POLICY_ACTIONS = [
     requiresTarget: false,
     effect: (state) => {
       const s = deepClone(state);
-      s.home.varieties = Math.round(s.home.varieties * 1.25);
+      s.home.varieties = Math.max(3, Math.round(s.home.varieties * 1.25));
       s.home.welfare = Math.round(s.home.welfare * 1.02);
       s.home.exportShare = Math.min(0.9, s.home.exportShare * 1.15);
       // Cost: slight gdp drag from subsidy
@@ -232,7 +232,7 @@ const POLICY_ACTIONS = [
     effect: (state) => {
       const s = deepClone(state);
       s.home.welfare = Math.round(s.home.welfare * 1.06);
-      s.home.varieties = Math.round(s.home.varieties * 1.2);
+      s.home.varieties = Math.max(3, Math.round(s.home.varieties * 1.2));
       s.home.ToT = s.home.ToT * 0.97; // slight adverse ToT from import surge
       Object.keys(s.trade).forEach(c => { s.trade[c] = Math.round(s.trade[c] * 1.2); });
       s.log.push({ turn: state.turn, type: "policy", text: `🌐 Unilateral liberalization. Welfare +6%, varieties +20%, all trade +20%. Import-competing sectors face pressure.` });
@@ -247,7 +247,7 @@ const SHOCKS = [
   { id: "global_recession", text: "📉 Global recession. All trade volumes fall 20%.", effect: s => { Object.keys(s.trade).forEach(c => { s.trade[c] = Math.round(s.trade[c] * 0.8); }); s.home.welfare = Math.round(s.home.welfare * 0.96); return s; } },
   { id: "tech_shock", text: "💡 Global tech breakthrough. Productivity gains for open economies.", effect: s => { s.home.productivity = Math.round(s.home.productivity * 1.05 * 100) / 100; s.home.welfare = Math.round(s.home.welfare * 1.03); return s; } },
   { id: "trade_war", text: "⚔ Global trade war erupts. High-tariff countries suffer most.", effect: s => { s.home.welfare = Math.round(s.home.welfare * 0.97); s.home.ToT = s.home.ToT * 0.92; return s; } },
-  { id: "pandemic", text: "🦠 Pandemic disrupts global supply chains. Trade costs rise.", effect: s => { Object.keys(s.trade).forEach(c => { s.trade[c] = Math.round(s.trade[c] * 0.7); }); s.home.varieties = Math.max(1, Math.round(s.home.varieties * 0.85)); return s; } },
+  { id: "pandemic", text: "🦠 Pandemic disrupts global supply chains. Trade costs rise.", effect: s => { Object.keys(s.trade).forEach(c => { s.trade[c] = Math.round(s.trade[c] * 0.7); }); s.home.varieties = Math.max(3, Math.round(s.home.varieties * 0.85)); return s; } },
   { id: "china_growth", text: "🐉 Sinica surges. Their export competitiveness increases.", effect: s => { s.countries.china.K = Math.round(s.countries.china.K * 1.1); s.countries.china.welfare = Math.round(s.countries.china.welfare * 1.04); return s; } },
   { id: "fdi_boom", text: "💰 FDI inflows surge. Capital deepening accelerates.", effect: s => { s.home.K = Math.round(s.home.K * 1.08); s.home.gdp = Math.round(s.home.gdp * 1.03); return s; } },
 ];
@@ -288,8 +288,9 @@ function applyAITurns(state) {
 
     const rel = s.relations[c];
 
-    // ── AI TARIFF: if relations < -10, 35% chance they tariff you ──
-    if (rel < -10 && Math.random() < 0.35) {
+    // ── AI TARIFF: if relations < -10, 25% chance they tariff you ──
+    const tariffCount = (s.log || []).filter(l => l.text.includes('imposed tariffs on Cascadia')).length;
+    if (rel < -10 && Math.random() < 0.25 && tariffCount < 3) {
       const eps = ELASTICITIES[c];
       const optTariff = 1 / (eps - 1);
       newCrises.push({
@@ -307,7 +308,7 @@ function applyAITurns(state) {
     }
 
     // ── CURRENCY WAR: if no FTA and country depreciates, 25% chance ──
-    if (!s.ftaPartners?.includes(c) && Math.random() < 0.25 && rel < 30) {
+    if (!s.ftaPartners?.includes(c) && Math.random() < 0.10 && rel < 0) {
       s.countries[c].ToT = Math.min(3, s.countries[c].ToT * 1.1);
       s.home.ToT = Math.max(0.2, s.home.ToT * 0.94);
       s.home.welfare = Math.round(s.home.welfare * 0.98);
@@ -563,7 +564,7 @@ function KLChart({ home, aiCountries }) {
 }
 
 function VarietyChart({ history, currentVarieties }) {
-  const autarky = 5; // baseline
+  const autarky = INITIAL_STATE.home.varieties; // baseline = 5
   const data = [
     { label: "Autarky", value: autarky, color: "#3a5a7a" },
     { label: "Turn 1", value: history[0]?.varieties ?? autarky, color: "#5a7a9a" },
@@ -646,6 +647,7 @@ function CrisisScreen({ crisis, state, onRespond }) {
     const eps = crisis.epsilon;
     const tOpt = crisis.optimalTariff;
     const tAgg = tOpt * 1.4;
+    const highMarketPower = eps < 2;
     const options = [
       {
         id: "absorb",
@@ -692,6 +694,14 @@ function CrisisScreen({ crisis, state, onRespond }) {
             At t*, you maximize the terms-of-trade gain from restricting their exports. Above t*, you over-restrict and your own consumers lose more than you gain. Below t*, you leave welfare on the table. The Nash tariff equilibrium (mutual retaliation) leaves both countries worse off than free trade.
           </div>
         </Card>
+
+        {highMarketPower && (
+          <div style={{ background: "rgba(232,127,127,0.08)", border: "1px solid #e87f7f44", borderLeft: "3px solid #e87f7f", padding: "0.7rem 1rem", marginBottom: "0.8rem", borderRadius: "2px" }}>
+            <span style={{ fontFamily: mono, fontSize: "0.68rem", color: "#e87f7f" }}>
+              ⚠ ε={eps.toFixed(1)} &lt; 2: Extreme market power. t*={( tOpt*100).toFixed(0)}% is a very high tariff — retaliation at this rate is likely to trigger an immediate trade war. Consider absorbing or negotiating instead.
+            </span>
+          </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
           {options.map(opt => (
@@ -1200,7 +1210,7 @@ export default function EconomicStatecraft() {
       Object.keys(s.relations).forEach(c => { if (c !== crisis.country) s.relations[c] = Math.max(-100, s.relations[c] - 5); });
     } else if (crisis.type === "currency_war" && responseId === "fta_offer") {
       s.ftaPartners = [...(s.ftaPartners || []), crisis.country];
-      s.home.varieties = Math.round(s.home.varieties * 1.1);
+      s.home.varieties = Math.max(3, Math.round(s.home.varieties * 1.1));
       s.log.push({ turn: s.turn, type: "policy", text: `🤝 FTA offered and accepted by ${COUNTRIES[crisis.country].name} to end currency war. Varieties +10%.` });
     } else if (crisis.type === "sanctions_coalition" && responseId === "diplomacy") {
       s.trade[crisis.country] = Math.round((s.trade[crisis.country] || 0) + 10);

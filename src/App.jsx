@@ -1,18 +1,54 @@
 import { useState } from "react";
-import EconomicStatecraft from './EconomicStatecraft.jsx'
+
 // ─── Shared UI Components ────────────────────────────────────────────────────
 
 function Slider({ label, value, min, max, step = 0.01, onChange, unit = "", desc }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const fmt = v => typeof v === "number" ? (step >= 1 ? v.toFixed(0) : v.toFixed(2)) : v;
+
+  const commitDraft = () => {
+    const parsed = parseFloat(draft);
+    if (!isNaN(parsed)) onChange(parsed);
+    setEditing(false);
+  };
+
   return (
     <div style={{ marginBottom: "1.1rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.3rem" }}>
         <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem", color: "#8a9bb0", letterSpacing: "0.04em" }}>{label}</span>
-        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.78rem", color: "#e2c97e", fontWeight: 600 }}>
-          {typeof value === "number" ? (step >= 1 ? value.toFixed(0) : value.toFixed(2)) : value}{unit}
-        </span>
+        {editing ? (
+          <input
+            autoFocus
+            type="number"
+            value={draft}
+            step={step}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commitDraft}
+            onKeyDown={e => { if (e.key === "Enter") commitDraft(); if (e.key === "Escape") setEditing(false); }}
+            style={{
+              background: "#0d1520", border: "1px solid #e2c97e", borderRadius: "2px",
+              color: "#e2c97e", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.78rem",
+              fontWeight: 600, width: 80, textAlign: "right", padding: "0.1rem 0.3rem",
+              outline: "none",
+            }}
+          />
+        ) : (
+          <span
+            onClick={() => { setDraft(fmt(value)); setEditing(true); }}
+            title="Click to type a custom value"
+            style={{
+              fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.78rem", color: "#e2c97e",
+              fontWeight: 600, cursor: "text", borderBottom: "1px dashed #5a5030",
+              paddingBottom: "1px",
+            }}
+          >
+            {fmt(value)}{unit}
+          </span>
+        )}
       </div>
       {desc && <div style={{ fontSize: "0.65rem", color: "#5a6a7a", marginBottom: "0.3rem", fontStyle: "italic" }}>{desc}</div>}
-      <input type="range" min={min} max={max} step={step} value={value}
+      <input type="range" min={min} max={Math.max(max, value)} step={step} value={Math.min(value, Math.max(max, value))}
         onChange={e => onChange(parseFloat(e.target.value))}
         style={{ width: "100%", accentColor: "#e2c97e", cursor: "pointer" }} />
     </div>
@@ -182,6 +218,51 @@ function RicardianModel() {
                 </>
               )}
             </AxesChart>
+          </div>
+          <div style={{ fontSize: "0.65rem", color: "#4a7fa5", letterSpacing: "0.08em", margin: "0.8rem 0 0.5rem" }}>REAL WAGES (units of good per hour of labor)</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem", marginBottom: "0.8rem" }}>
+            <div style={{ background: "rgba(74,127,165,0.07)", border: "1px solid rgba(74,127,165,0.15)", borderRadius: "2px", padding: "0.7rem" }}>
+              <div style={{ fontSize: "0.6rem", color: "#4a7fa5", fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>HOME — AUTARKY vs TRADE</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.3rem", fontSize: "0.62rem", fontFamily: "'IBM Plex Mono', monospace" }}>
+                <div style={{ color: "#3a5a7a" }}></div>
+                <div style={{ color: "#3a5a7a", textAlign: "right" }}>Cloth</div>
+                <div style={{ color: "#3a5a7a", textAlign: "right" }}>Wheat</div>
+                <div style={{ color: "#8a9bb0" }}>Autarky</div>
+                <div style={{ color: "#c8d8e8", textAlign: "right" }}>{(1/p.aLC).toFixed(3)}</div>
+                <div style={{ color: "#c8d8e8", textAlign: "right" }}>{(1/p.aLW).toFixed(3)}</div>
+                <div style={{ color: "#e2c97e" }}>Trade</div>
+                <div style={{ color: homeCA === "Cloth" ? "#7fe87f" : "#c8d8e8", textAlign: "right", fontWeight: homeCA === "Cloth" ? 700 : 400 }}>
+                  {homeCA === "Cloth" ? (1/p.aLC).toFixed(3) : `≥${(1/p.aLC).toFixed(3)}`}
+                </div>
+                <div style={{ color: homeCA === "Wheat" ? "#7fe87f" : "#c8d8e8", textAlign: "right", fontWeight: homeCA === "Wheat" ? 700 : 400 }}>
+                  {homeCA === "Wheat" ? (1/p.aLW).toFixed(3) : `≥${(1/p.aLW).toFixed(3)}`}
+                </div>
+              </div>
+              <div style={{ fontSize: "0.6rem", color: "#5a7a5a", marginTop: "0.4rem", fontStyle: "italic" }}>
+                Specializes in {homeCA} — real wage in {homeCA} unchanged, real wage in {homeCA === "Cloth" ? "Wheat" : "Cloth"} rises via trade.
+              </div>
+            </div>
+            <div style={{ background: "rgba(165,127,165,0.07)", border: "1px solid rgba(165,127,165,0.15)", borderRadius: "2px", padding: "0.7rem" }}>
+              <div style={{ fontSize: "0.6rem", color: "#a57fa5", fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>FOREIGN — AUTARKY vs TRADE</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.3rem", fontSize: "0.62rem", fontFamily: "'IBM Plex Mono', monospace" }}>
+                <div style={{ color: "#3a5a7a" }}></div>
+                <div style={{ color: "#3a5a7a", textAlign: "right" }}>Cloth</div>
+                <div style={{ color: "#3a5a7a", textAlign: "right" }}>Wheat</div>
+                <div style={{ color: "#8a9bb0" }}>Autarky</div>
+                <div style={{ color: "#c8d8e8", textAlign: "right" }}>{(1/p.aLCs).toFixed(3)}</div>
+                <div style={{ color: "#c8d8e8", textAlign: "right" }}>{(1/p.aLWs).toFixed(3)}</div>
+                <div style={{ color: "#e2c97e" }}>Trade</div>
+                <div style={{ color: forCA === "Cloth" ? "#7fe87f" : "#c8d8e8", textAlign: "right", fontWeight: forCA === "Cloth" ? 700 : 400 }}>
+                  {forCA === "Cloth" ? (1/p.aLCs).toFixed(3) : `≥${(1/p.aLCs).toFixed(3)}`}
+                </div>
+                <div style={{ color: forCA === "Wheat" ? "#7fe87f" : "#c8d8e8", textAlign: "right", fontWeight: forCA === "Wheat" ? 700 : 400 }}>
+                  {forCA === "Wheat" ? (1/p.aLWs).toFixed(3) : `≥${(1/p.aLWs).toFixed(3)}`}
+                </div>
+              </div>
+              <div style={{ fontSize: "0.6rem", color: "#5a7a5a", marginTop: "0.4rem", fontStyle: "italic" }}>
+                Specializes in {forCA} — real wage in {forCA} unchanged, real wage in {forCA === "Cloth" ? "Wheat" : "Cloth"} rises via trade.
+              </div>
+            </div>
           </div>
           <div style={{ fontSize: "0.7rem", color: "#5a7a5a", fontStyle: "italic", background: "rgba(90,160,90,0.06)", padding: "0.6rem", borderLeft: "2px solid #3a7a3a" }}>
             {tradeExists ? `Trade is mutually beneficial. Home specializes in ${homeCA}, Foreign in ${forCA}.` : "Both countries have identical relative productivities — no gains from trade."}
@@ -753,7 +834,7 @@ export default function App() {
       <Nav />
       <Routes>
         <Route path="/" element={<SimulatorPage />} />
-        <Route path="/game" element={<EconomicStatecraft />} />
+        <Route path="/game" element={<div style={{ padding: "3rem 2rem", color: "#e2c97e", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.9rem" }}>STATECRAFT — loading soon...</div>} />
       </Routes>
     </div>
   );
