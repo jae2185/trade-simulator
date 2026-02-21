@@ -1,5 +1,5 @@
 import { useState } from "react";
-
+import EconomicStatecraft from './EconomicStatecraft.jsx'
 // ─── Shared UI Components ────────────────────────────────────────────────────
 
 function Slider({ label, value, min, max, step = 0.01, onChange, unit = "", desc }) {
@@ -675,6 +675,8 @@ function MelitzModel() {
 
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
 
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
+
 const MODELS = [
   { id: "ricardian", label: "Ricardian", subtitle: "Comparative Advantage", Component: RicardianModel },
   { id: "ho", label: "Heckscher-Ohlin", subtitle: "Factor Endowments", Component: HOModel },
@@ -683,26 +685,37 @@ const MODELS = [
   { id: "melitz", label: "Melitz", subtitle: "Firm Heterogeneity", Component: MelitzModel },
 ];
 
-export default function TradeSimulator() {
+function Nav() {
+  const loc = useLocation();
+  const linkStyle = (path) => ({
+    borderBottom: `2px solid ${loc.pathname === path ? "#e2c97e" : "transparent"}`,
+    color: loc.pathname === path ? "#e2c97e" : "#3a5a7a",
+    padding: "1.2rem 1.2rem",
+    fontFamily: "'IBM Plex Mono', monospace",
+    fontSize: "0.72rem",
+    letterSpacing: "0.06em",
+    textDecoration: "none",
+    display: "flex",
+    alignItems: "center",
+    transition: "color 0.15s",
+  });
+  return (
+    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 2rem", display: "flex", alignItems: "stretch" }}>
+      <div style={{ padding: "1.2rem 2rem 1.2rem 0", marginRight: "1rem", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ fontSize: "1.1rem", fontWeight: 300, letterSpacing: "0.05em", color: "#e2c97e" }}>International Trade</div>
+        <div style={{ fontSize: "0.65rem", color: "#3a5a7a", letterSpacing: "0.15em", textTransform: "uppercase", fontFamily: "'IBM Plex Mono', monospace" }}>Economic Simulator</div>
+      </div>
+      <Link to="/" style={linkStyle("/")}>MODELS</Link>
+      <Link to="/game" style={linkStyle("/game")}>STATECRAFT ▸</Link>
+    </div>
+  );
+}
+
+function SimulatorPage() {
   const [active, setActive] = useState("ricardian");
   const model = MODELS.find(m => m.id === active);
-
   return (
-    <div style={{ minHeight: "100vh", background: "#0d1520", color: "#c8d8e8", fontFamily: "'IBM Plex Sans', 'IBM Plex Mono', monospace" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;1,300&display=swap');
-        input[type=range] { -webkit-appearance: none; height: 3px; border-radius: 2px; background: #1e2e3e; outline: none; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #e2c97e; cursor: pointer; border: 2px solid #0d1520; }
-        select option { background: #0d1520; }
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #0d1520; } ::-webkit-scrollbar-thumb { background: #2a3a4a; }
-      `}</style>
-
-      <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "1.2rem 2rem" }}>
-        <div style={{ fontSize: "1.1rem", fontWeight: 300, letterSpacing: "0.05em", color: "#e2c97e" }}>International Trade</div>
-        <div style={{ fontSize: "0.65rem", color: "#3a5a7a", letterSpacing: "0.15em", textTransform: "uppercase", fontFamily: "'IBM Plex Mono', monospace" }}>Interactive Model Simulator</div>
-      </div>
-
+    <>
       <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "0 2rem", overflowX: "auto" }}>
         {MODELS.map(m => (
           <button key={m.id} onClick={() => setActive(m.id)} style={{
@@ -718,10 +731,30 @@ export default function TradeSimulator() {
           </button>
         ))}
       </div>
-
       <div style={{ padding: "1.5rem 2rem", maxWidth: "980px", margin: "0 auto" }}>
         <model.Component />
       </div>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <div style={{ minHeight: "100vh", background: "#0d1520", color: "#c8d8e8", fontFamily: "'IBM Plex Sans', 'IBM Plex Mono', monospace" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;1,300&display=swap');
+        input[type=range] { -webkit-appearance: none; height: 3px; border-radius: 2px; background: #1e2e3e; outline: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #e2c97e; cursor: pointer; border: 2px solid #0d1520; }
+        select option { background: #0d1520; }
+        * { box-sizing: border-box; }
+        a { text-decoration: none; }
+        ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #0d1520; } ::-webkit-scrollbar-thumb { background: #2a3a4a; }
+      `}</style>
+      <Nav />
+      <Routes>
+        <Route path="/" element={<SimulatorPage />} />
+        <Route path="/game" element={<EconomicStatecraft />} />
+      </Routes>
     </div>
   );
 }
