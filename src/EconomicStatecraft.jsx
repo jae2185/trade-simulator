@@ -131,10 +131,10 @@ const INITIAL_STATE = {
 
   // AI country states
   countries: {
-    usa:  { K: 250, L: 150, welfare: 100, gdp: 350, ToT: 1.2, relations_to_home: 20 },
-    china:{ K: 180, L: 300, welfare: 100, gdp: 280, ToT: 0.9, relations_to_home: 10 },
-    eu:   { K: 200, L: 160, welfare: 100, gdp: 300, ToT: 1.1, relations_to_home: 40 },
-    em:   { K: 60,  L: 200, welfare: 100, gdp: 100, ToT: 0.7, relations_to_home: 30 },
+    usa:  { K: 250, L: 150, welfare: 100, gdp: 200, ToT: 1.2, relations_to_home: 20 },
+    china:{ K: 180, L: 300, welfare: 100, gdp: 170, ToT: 0.9, relations_to_home: 10 },
+    eu:   { K: 200, L: 160, welfare: 100, gdp: 185, ToT: 1.1, relations_to_home: 40 },
+    em:   { K: 60,  L: 200, welfare: 100, gdp:  80, ToT: 0.7, relations_to_home: 30 },
   },
 };
 
@@ -154,6 +154,7 @@ const POLICY_ACTIONS = [
       // Krugman: more varieties, lower prices
       s.home.varieties = Math.max(3, Math.round(s.home.varieties * 1.15));
       s.home.welfare = Math.round(s.home.welfare * 1.04);
+      s.home.gdp = Math.round(s.home.gdp * 1.05);
       s.home.ToT = Math.min(3, s.home.ToT * 1.05);
       s.ftaPartners = [...(s.ftaPartners || []), target];
       if (!s.stability) s.stability = {};
@@ -232,7 +233,7 @@ const POLICY_ACTIONS = [
     effect: (state) => {
       const s = deepClone(state);
       s.home.K = Math.round(s.home.K * 1.12);
-      s.home.gdp = Math.round(s.home.gdp * 1.03);
+      s.home.gdp = Math.round(s.home.gdp * 1.07);
       // H-O: becoming more capital abundant shifts exports
       const newKL = s.home.K / s.home.L;
       s.log.push({ turn: state.turn, type: "policy", text: `🏭 Capital investment program launched. K +12%, K/L ratio now ${newKL.toFixed(2)}. Comparative advantage shifting.` });
@@ -250,7 +251,7 @@ const POLICY_ACTIONS = [
       const s = deepClone(state);
       s.home.productivity = Math.round(s.home.productivity * 1.08 * 100) / 100;
       s.home.welfare = Math.round(s.home.welfare * 1.03);
-      s.home.gdp = Math.round(s.home.gdp * 1.04);
+      s.home.gdp = Math.round(s.home.gdp * 1.08);
       s.log.push({ turn: state.turn, type: "policy", text: `🎓 Education investment. TFP +8% → ${s.home.productivity.toFixed(2)}. Welfare +3%, GDP +4%.` });
       return s;
     },
@@ -378,7 +379,7 @@ function applyAITurns(state) {
   Object.keys(s.countries).forEach(c => {
     const p = AI_PERSONALITIES[c];
     // AI growth
-    s.countries[c].gdp = Math.round(s.countries[c].gdp * (1 + Math.random() * 0.03));
+    s.countries[c].gdp = Math.round(s.countries[c].gdp * (1 + Math.random() * 0.015));
     s.countries[c].welfare = Math.round(s.countries[c].welfare * (1 + (Math.random() - 0.3) * 0.02));
     s.relations[c] = Math.round(s.relations[c] * p.forgiveRate); // drift per personality
 
@@ -550,6 +551,25 @@ function IntroScreen({ onStart }) {
       <div style={{ fontFamily: mono, fontSize: "0.65rem", color: diff.color, marginBottom: "0.4rem" }}>{diff.desc}</div>
       <div style={{ fontFamily: mono, fontSize: "0.6rem", color: C.dim, marginBottom: "2rem" }}>
         {diff.actionsPerTurn} actions/turn · Relations {diff.relationsBonus >= 0 ? "+" : ""}{diff.relationsBonus} · Shock ×{diff.shockMult} · AI ×{diff.aiAggrMult}
+      </div>
+
+      {/* Win/Lose rules */}
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: C.dim, letterSpacing: "0.1em", marginBottom: "0.6rem" }}>OBJECTIVES</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", marginBottom: "0.5rem", maxWidth: 560 }}>
+        {[
+          { icon: "📈", label: "Economic Dominance", desc: "Finish with higher GDP than all rival nations" },
+          { icon: "📊", label: "Welfare Threshold", desc: "Reach a welfare index of 130 or above" },
+          { icon: "🛡", label: "Survive 8 Turns", desc: "Keep welfare above the collapse threshold of 70" },
+        ].map((obj, i) => (
+          <div key={i} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, padding: "0.6rem 0.7rem", borderRadius: "2px", textAlign: "left" }}>
+            <div style={{ fontSize: "1rem", marginBottom: "0.3rem" }}>{obj.icon}</div>
+            <div style={{ fontFamily: mono, fontSize: "0.62rem", color: C.text, fontWeight: 600, marginBottom: "0.2rem" }}>{obj.label}</div>
+            <div style={{ fontFamily: mono, fontSize: "0.58rem", color: C.dim, lineHeight: 1.5 }}>{obj.desc}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", color: "#3a5a7a", marginBottom: "1.5rem" }}>
+        3/3 = GRAND MASTER 🏆 · 2/3 = STRATEGIST ⭐ · 1/3 = DIPLOMAT 🕊 · Welfare &lt; 70 = DEFEAT 💀
       </div>
 
       <button onClick={() => onStart(difficulty)} style={{
@@ -989,6 +1009,64 @@ function CrisisScreen({ crisis, state, onRespond }) {
   return null;
 }
 
+
+function OpponentStats({ state }) {
+  const [open, setOpen] = useState(false);
+  const allGdps = Object.values(state.countries).map(c => c.gdp);
+  const maxGdp = Math.max(...allGdps, state.home.gdp);
+  return (
+    <div style={{ marginTop: "1.2rem", border: `1px solid ${C.border}`, borderRadius: "2px" }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: "100%", background: "none", border: "none", borderBottom: open ? `1px solid ${C.border}` : "none",
+        color: C.dim, fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.12em",
+        padding: "0.5rem 0.8rem", cursor: "pointer", display: "flex", justifyContent: "space-between",
+        alignItems: "center", textAlign: "left",
+      }}>
+        <span>WORLD STANDINGS</span>
+        <span>{open ? "▾" : "▸"}</span>
+      </button>
+      {open && (
+        <div style={{ padding: "0.6rem 0.8rem" }}>
+          {/* Cascadia row */}
+          <div style={{ marginBottom: "0.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: "0.62rem", marginBottom: "0.2rem" }}>
+              <span style={{ color: C.gold }}>🏔 Cascadia (You)</span>
+              <span style={{ color: C.gold }}>GDP {state.home.gdp} · W {state.home.welfare}</span>
+            </div>
+            <div style={{ background: "#1a2a3a", borderRadius: "1px", height: 5 }}>
+              <div style={{ width: `${(state.home.gdp / maxGdp) * 100}%`, height: "100%", background: C.gold, borderRadius: "1px", transition: "width 0.3s" }} />
+            </div>
+          </div>
+          {/* AI rows */}
+          {Object.entries(state.countries).map(([k, c]) => {
+            const rel = state.relations[k];
+            const relColor = rel > 30 ? "#7fe87f" : rel < -10 ? "#e87f7f" : C.dim;
+            const ahead = c.gdp > state.home.gdp;
+            return (
+              <div key={k} style={{ marginBottom: "0.5rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono, fontSize: "0.62rem", marginBottom: "0.2rem" }}>
+                  <span style={{ color: COUNTRIES[k].color }}>{COUNTRIES[k].flag} {COUNTRIES[k].name}</span>
+                  <span>
+                    <span style={{ color: ahead ? "#e87f7f" : "#7fe87f" }}>GDP {c.gdp}</span>
+                    <span style={{ color: C.dim }}> · W {c.welfare}</span>
+                    <span style={{ color: relColor, marginLeft: "0.5rem" }}>({rel > 0 ? "+" : ""}{rel})</span>
+                  </span>
+                </div>
+                <div style={{ background: "#1a2a3a", borderRadius: "1px", height: 5 }}>
+                  <div style={{ width: `${(c.gdp / maxGdp) * 100}%`, height: "100%", background: COUNTRIES[k].color, borderRadius: "1px", opacity: 0.7, transition: "width 0.3s" }} />
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ fontFamily: mono, fontSize: "0.58rem", color: "#2a4a6a", marginTop: "0.4rem", borderTop: `1px solid ${C.border}`, paddingTop: "0.4rem" }}>
+            Red GDP = rival ahead of you · Green = you're leading · Relation score in ()
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BriefingScreen({ state, onContinue }) {
   const shock = state.shock;
   return (
@@ -1053,6 +1131,7 @@ function BriefingScreen({ state, onContinue }) {
       }}>
         PROCEED TO POLICY ACTIONS ▸
       </button>
+      <OpponentStats state={state} />
     </div>
   );
 }
@@ -1183,6 +1262,7 @@ function ActionScreen({ state, onAction, onEndTurn }) {
           }}>
             END TURN — ADVANCE TO {2024 + state.turn + 1} ▸
           </button>
+          <OpponentStats state={state} />
         </div>
       </div>
       <div style={{ padding: "0 0 1.5rem 0" }}>
@@ -1193,28 +1273,69 @@ function ActionScreen({ state, onAction, onEndTurn }) {
 }
 
 function GameOverScreen({ state, onRestart }) {
-  const rating = getWelfareRating(state.home.welfare);
+  const outcome = evaluateOutcome({ ...state, turn: TOTAL_TURNS + 1 });
   const welfareChange = state.home.welfare - 100;
   const topAlly = Object.entries(state.relations).sort((a, b) => b[1] - a[1])[0];
   const topRival = Object.entries(state.relations).sort((a, b) => a[1] - b[1])[0];
+  const allGDPs = Object.values(state.countries).map(c => c.gdp);
+  const maxAIGdp = Math.max(...allGDPs);
+  const isDefeat = outcome?.result === "defeat" || state.home.welfare < 70;
+  const tierColor = isDefeat ? "#e87f7f" : (outcome?.color || C.gold);
+  const tierIcon = isDefeat ? "💀" : (outcome?.icon || "📋");
+  const tierLabel = isDefeat ? "DEFEAT" : outcome?.tier;
 
   return (
     <div style={{ minHeight: "80vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-      <div style={{ fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.2em", color: C.dim, marginBottom: "1rem" }}>SIMULATION COMPLETE — YEAR {2024 + TOTAL_TURNS}</div>
-      <div style={{ fontSize: "2rem", color: rating.color, fontFamily: mono, fontWeight: 300, marginBottom: "0.5rem" }}>{rating.label.toUpperCase()}</div>
-      <div style={{ fontFamily: mono, fontSize: "0.75rem", color: C.dim, marginBottom: "2rem" }}>
-        Final Welfare Index: <span style={{ color: rating.color, fontWeight: 700 }}>{state.home.welfare}</span>
+      <div style={{ fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.2em", color: C.dim, marginBottom: "1rem" }}>
+        {isDefeat ? "ECONOMIC CRISIS — SIMULATION TERMINATED" : `SIMULATION COMPLETE — YEAR ${2024 + TOTAL_TURNS}`}
+      </div>
+      <div style={{ fontSize: "3rem", marginBottom: "0.4rem" }}>{tierIcon}</div>
+      <div style={{ fontSize: "2rem", color: tierColor, fontFamily: mono, fontWeight: 300, marginBottom: "0.3rem", letterSpacing: "0.08em" }}>{tierLabel}</div>
+      <div style={{ fontFamily: mono, fontSize: "0.75rem", color: C.dim, marginBottom: "1.5rem" }}>
+        Final Welfare: <span style={{ color: tierColor, fontWeight: 700 }}>{state.home.welfare}</span>
         <span style={{ marginLeft: "1rem", color: welfareChange >= 0 ? "#7fe87f" : "#e87f7f" }}>
           ({welfareChange >= 0 ? "+" : ""}{welfareChange} from baseline)
         </span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "2rem", maxWidth: 640, width: "100%" }}>
+      {/* Objectives checklist */}
+      {!isDefeat && outcome?.conditions && (
+        <div style={{ maxWidth: 500, width: "100%", marginBottom: "1.2rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: C.dim, letterSpacing: "0.1em", marginBottom: "0.5rem" }}>OBJECTIVES</div>
+          {outcome.conditions.map((c, i) => (
+            <div key={i} style={{
+              display: "flex", alignItems: "flex-start", gap: "0.7rem",
+              fontFamily: mono, fontSize: "0.68rem", marginBottom: "0.4rem",
+              padding: "0.5rem 0.8rem", borderRadius: "2px",
+              background: c.met ? "rgba(127,232,127,0.06)" : "rgba(255,255,255,0.02)",
+              border: `1px solid ${c.met ? "#7fe87f44" : "#2a3a4a"}`,
+            }}>
+              <span style={{ color: c.met ? "#7fe87f" : "#3a5a7a", fontSize: "0.9rem" }}>{c.met ? "✓" : "✗"}</span>
+              <div>
+                <div style={{ color: c.met ? "#7fe87f" : "#3a5a7a", fontWeight: 600 }}>{c.label}</div>
+                <div style={{ color: "#3a5a7a", fontSize: "0.62rem", marginTop: "0.1rem" }}>{c.desc}</div>
+              </div>
+            </div>
+          ))}
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: "#2a4a6a", marginTop: "0.4rem", textAlign: "center" }}>
+            3/3 = GRAND MASTER 🏆 · 2/3 = STRATEGIST ⭐ · 1/3 = DIPLOMAT 🕊 · 0/3 = SURVIVED 📋
+          </div>
+        </div>
+      )}
+      {isDefeat && (
+        <div style={{ maxWidth: 500, width: "100%", marginBottom: "1.2rem", padding: "0.8rem 1rem",
+          background: "rgba(232,127,127,0.06)", border: "1px solid #e87f7f44", borderRadius: "2px",
+          fontFamily: mono, fontSize: "0.7rem", color: "#e87f7f", textAlign: "center" }}>
+          Cascadia's welfare fell below 70 — economic collapse triggered. Keep welfare above 70 to survive.
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1.5rem", maxWidth: 640, width: "100%" }}>
         <Card title="Economy" accent={C.gold}>
-          <StatRow label="GDP" value={state.home.gdp} />
-          <StatRow label="Productivity" value={state.home.productivity.toFixed(2)} />
-          <StatRow label="K/L Ratio" value={(state.home.K / state.home.L).toFixed(2)} />
+          <StatRow label="GDP" value={state.home.gdp} color={state.home.gdp > maxAIGdp ? "#7fe87f" : C.text} />
+          <StatRow label="Max AI GDP" value={maxAIGdp} />
           <StatRow label="Varieties" value={state.home.varieties} />
+          <StatRow label="K/L Ratio" value={(state.home.K / state.home.L).toFixed(2)} />
         </Card>
         <Card title="Trade" accent={C.blue}>
           <StatRow label="Terms of Trade" value={state.home.ToT.toFixed(2)} />
@@ -1222,18 +1343,20 @@ function GameOverScreen({ state, onRestart }) {
           <StatRow label="Top Ally" value={COUNTRIES[topAlly[0]].name} color={COUNTRIES[topAlly[0]].color} />
           <StatRow label="Top Rival" value={COUNTRIES[topRival[0]].name} color="#e87f7f" />
         </Card>
-        <Card title="Score" accent={rating.color}>
-          <div style={{ textAlign: "center", paddingTop: "0.5rem" }}>
-            <div style={{ fontFamily: mono, fontSize: "2rem", color: rating.color, fontWeight: 700 }}>{state.home.welfare}</div>
-            <div style={{ fontFamily: mono, fontSize: "0.62rem", color: C.dim, marginTop: "0.3rem" }}>welfare index</div>
-            <div style={{ fontFamily: mono, fontSize: "0.9rem", color: rating.color, marginTop: "0.8rem" }}>{rating.label}</div>
+        <Card title="Result" accent={tierColor}>
+          <div style={{ textAlign: "center", paddingTop: "0.3rem" }}>
+            <div style={{ fontSize: "2.5rem" }}>{tierIcon}</div>
+            <div style={{ fontFamily: mono, fontSize: "1rem", color: tierColor, fontWeight: 700, marginTop: "0.3rem" }}>{tierLabel}</div>
+            <div style={{ fontFamily: mono, fontSize: "0.62rem", color: C.dim, marginTop: "0.2rem" }}>
+              {isDefeat ? "welfare collapsed" : `${outcome?.conditions?.filter(c => c.met).length}/${outcome?.conditions?.length} objectives`}
+            </div>
           </div>
         </Card>
       </div>
 
-      <div style={{ maxWidth: 600, width: "100%", marginBottom: "2rem" }}>
+      <div style={{ maxWidth: 600, width: "100%", marginBottom: "1.5rem" }}>
         <Card title="Event Log" accent={C.dim}>
-          <div style={{ maxHeight: 200, overflowY: "auto" }}>
+          <div style={{ maxHeight: 180, overflowY: "auto" }}>
             {state.log.map((l, i) => (
               <div key={i} style={{ fontFamily: mono, fontSize: "0.65rem", color: "#5a7a9a", marginBottom: "0.3rem", lineHeight: 1.6 }}>
                 <span style={{ color: C.dim }}>Y{2024 + l.turn} </span>{l.text}
@@ -1244,7 +1367,7 @@ function GameOverScreen({ state, onRestart }) {
       </div>
 
       <button onClick={onRestart} style={{
-        background: "none", border: `1px solid ${C.gold}`, color: C.gold,
+        background: "none", border: `1px solid ${tierColor}`, color: tierColor,
         fontFamily: mono, fontSize: "0.72rem", letterSpacing: "0.1em",
         padding: "0.7rem 2rem", cursor: "pointer", borderRadius: "2px",
       }}>
@@ -1252,6 +1375,29 @@ function GameOverScreen({ state, onRestart }) {
       </button>
     </div>
   );
+}
+
+
+function evaluateOutcome(state) {
+  const { home, countries } = state;
+  if (home.welfare < 70) {
+    return { result: "defeat", icon: "💀", color: "#e87f7f" };
+  }
+  const maxAIGdp = Math.max(...Object.values(countries).map(c => c.gdp));
+  const conditions = [
+    { met: home.gdp > maxAIGdp, label: "Economic Dominance", desc: `GDP ${home.gdp} vs rival max ${maxAIGdp}` },
+    { met: home.welfare >= 130,  label: "Welfare Threshold",  desc: `Welfare ${home.welfare} ≥ 130` },
+    { met: home.welfare >= 70,   label: "Survived 8 Turns",   desc: "Welfare never collapsed below 70" },
+  ];
+  const met = conditions.filter(c => c.met).length;
+  const tiers = [
+    { n: 3, tier: "GRAND MASTER", icon: "🏆", color: "#e2c97e" },
+    { n: 2, tier: "STRATEGIST",   icon: "⭐", color: "#4a9fe8" },
+    { n: 1, tier: "DIPLOMAT",     icon: "🕊",  color: "#7fe87f" },
+    { n: 0, tier: "SURVIVED",     icon: "📋", color: "#8a9bb0" },
+  ];
+  const t = tiers.find(x => x.n <= met);
+  return { result: "victory", ...t, conditions };
 }
 
 // ─── MAIN GAME ───────────────────────────────────────────────────────────────
@@ -1267,8 +1413,17 @@ export default function EconomicStatecraft() {
   });
 
   // Fix: initialize properly
-  const initGame = () => {
+  const initGame = (difficulty = "strategist") => {
     let s = deepClone(INITIAL_STATE);
+    const diff = DIFFICULTIES[difficulty] || DIFFICULTIES["strategist"];
+    s.difficulty = difficulty;
+    s.actionsLeft = diff.actionsPerTurn;
+    s.hostility = {};
+    s.stability = {};
+    s.sanctionHistory = [];
+    Object.keys(s.relations).forEach(c => {
+      s.relations[c] = Math.max(-100, Math.min(100, s.relations[c] + diff.relationsBonus));
+    });
     const shock = rollShock();
     s.shock = shock;
     s = shock.effect(s);

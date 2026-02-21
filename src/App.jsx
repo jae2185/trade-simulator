@@ -1,4 +1,5 @@
 import { useState } from "react";
+import EconomicStatecraft from "./EconomicStatecraft";
 
 // ─── Shared UI Components ────────────────────────────────────────────────────
 
@@ -2052,7 +2053,7 @@ export default function App() {
       <Nav />
       <Routes>
         <Route path="/" element={<SimulatorPage />} />
-        <Route path="/game" element={<div style={{ padding: "3rem 2rem", color: "#e2c97e", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.9rem" }}>STATECRAFT — loading soon...</div>} />
+        <Route path="/game" element={<EconomicStatecraft />} />
       </Routes>
     </div>
   );
