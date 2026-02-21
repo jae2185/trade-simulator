@@ -156,6 +156,271 @@ const RICARDIAN_PRESETS = [
   { id: "germany_greece", label: "Germany vs Greece (EU asymmetry)", params: { aLC: 0.8, aLW: 1.5, aLCs: 2, aLWs: 1.2, L: 150, Ls: 80 } },
 ];
 
+
+// ─── WORLD RELATIVE SUPPLY CURVE ─────────────────────────────────────────────
+
+function RSCurve({ p, homeCA, hCloth, hWheat, fCloth, fWheat, homeRatio, forRatio, tradeExists }) {
+  const [rdShare, setRdShare] = useState(0.6); // expenditure share on cloth: P_c*Q_c / (P_c*Q_c + P_w*Q_w)
+  // Normalize so "Cloth" = the CA good of Home, "Wheat" = CA good of Foreign
+  // RS curve: x-axis = relative price P_cloth/P_wheat, y-axis = Q_cloth/Q_wheat (world)
+  // Three segments:
+  //   1. P < homeRatio: only foreign produces cloth (if forCA=Cloth) — flat at low RS
+  //   2. P = homeRatio: home indifferent, vertical jump
+  //   3. homeRatio < P < forRatio: home fully specializes in cloth, foreign in wheat — flat at RS = hCloth/fWheat
+  //   4. P = forRatio: foreign indifferent, second vertical jump
+  //   5. P > forRatio: both specialize, RS flat at higher level
+
+  // Always define lower/upper autarky prices correctly
+  const pLo = Math.min(homeRatio, forRatio); // lower autarky price = CA country's price
+  const pHi = Math.max(homeRatio, forRatio);
+
+  // Home has CA in Cloth if homeRatio < forRatio
+  const homeCACloth = homeCA === "Cloth";
+
+  // RS values at each segment
+  // Segment before pLo: only home-CA-cloth country produces cloth
+  // If homeCACloth: home produces all cloth = hCloth, foreign produces all wheat = fWheat
+  //   but at P < pLo, home would actually NOT produce cloth (it's not profitable yet)
+  //   Krugman framework: at P < pLo, only foreign-CA-cloth country produces cloth
+  // Let's define:
+  //   rs_low  = output of cloth-CA country's cloth / other's wheat (before first jump)
+  //   rs_mid  = (cloth-CA country max cloth) / (wheat-CA country max wheat) — between jumps
+  //   rs_high = world cloth / world wheat when both specialize
+
+  const clothMax = homeCACloth ? hCloth : fCloth;   // max cloth from CA country
+  const wheatMax = homeCACloth ? fWheat : hWheat;   // max wheat from CA country
+
+  // rs_mid = full specialization of both
+  const rs_mid = clothMax / wheatMax;
+
+  // Before pLo: only the cloth-CA country produces cloth, but only partially
+  // In standard Krugman: at P < pLo, NEITHER country fully specializes in cloth
+  // RS is flat at rs_mid between pLo and pHi (both fully specialize)
+  // Below pLo: cloth-CA country produces some cloth (indeterminate without demand)
+  // Conventionally shown as vertical at pLo rising to rs_mid
+
+  // Chart dimensions
+  const W = 560; const H = 200;
+  const pad = { top: 20, right: 20, bottom: 44, left: 52 };
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
+
+  const pMax = pHi * 1.5;
+  const rsMax = rs_mid * 2.2;
+
+  const sx = v => (v / pMax) * cW;
+  const sy = v => cH - (v / rsMax) * cH;
+
+  // Key x positions
+  const x1 = sx(pLo);
+  const x2 = sx(pHi);
+
+  // RS path points:
+  // Flat at rs_mid/2 from 0 to pLo (before home specializes — approximate low RS)
+  const rs_low = rs_mid * 0.35;
+  // Vertical jump at pLo from rs_low to rs_mid
+  // Flat at rs_mid from pLo to pHi
+  // Vertical jump at pHi from rs_mid to rs_high
+  const rs_high = rs_mid * 1.65;
+  // Flat at rs_high beyond pHi
+
+  const mono = "'IBM Plex Mono', monospace";
+  const gold = "#e2c97e";
+  const blue = "#4a9fe8";
+  const purple = "#a57fa5";
+  const dim = "#3a5a7a";
+  const green = "#7fe87f";
+
+  // Equilibrium price label (midpoint of flat segment)
+  const pEq = (pLo + pHi) / 2;
+
+  if (!tradeExists) return null;
+
+  return (
+    <div>
+      <div style={{ fontSize: "0.65rem", color: "#4a7fa5", letterSpacing: "0.08em", marginBottom: "0.6rem", fontFamily: mono }}>
+        WORLD RELATIVE SUPPLY CURVE
+      </div>
+      <div style={{ fontSize: "0.62rem", color: "#5a6a7a", marginBottom: "0.5rem", fontStyle: "italic", fontFamily: mono }}>
+        x-axis: relative price P_cloth / P_wheat &nbsp;|&nbsp; y-axis: Q_cloth / Q_wheat (world)
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.6rem" }}>
+        <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, whiteSpace: "nowrap" }}>
+          RD expenditure share on cloth (θ):
+        </span>
+        <input type="range" min={0.1} max={0.9} step={0.01} value={rdShare}
+          onChange={e => setRdShare(parseFloat(e.target.value))}
+          style={{ accentColor: green, flex: 1, cursor: "pointer" }} />
+        <span style={{ fontFamily: mono, fontSize: "0.72rem", color: green, fontWeight: 600, minWidth: 36 }}>
+          {rdShare.toFixed(2)}
+        </span>
+        <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>
+          → RD: P={`(${rdShare.toFixed(2)}/${(1-rdShare).toFixed(2)}) × (Q_w/Q_c)`}
+        </span>
+      </div>
+      <svg width={W} height={H} style={{ fontFamily: mono, display: "block" }}>
+        <g transform={`translate(${pad.left},${pad.top})`}>
+          {/* Grid */}
+          {[0.25, 0.5, 0.75, 1].map(f => (
+            <line key={f} x1={0} y1={sy(f * rsMax)} x2={cW} y2={sy(f * rsMax)} stroke="rgba(255,255,255,0.03)" />
+          ))}
+          {/* Axes */}
+          <line x1={0} y1={cH} x2={cW} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
+          <line x1={0} y1={0} x2={0} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
+
+          {/* Axis labels */}
+          <text x={cW / 2} y={cH + 34} textAnchor="middle" fill={dim} fontSize={8.5}>
+            Relative Price (P_cloth / P_wheat)
+          </text>
+          <text x={-cH / 2} y={-38} textAnchor="middle" fill={dim} fontSize={8.5} transform="rotate(-90)">
+            Relative Quantity (Q_cloth / Q_wheat)
+          </text>
+
+          {/* Tick labels — x axis */}
+          {[pLo, pHi].map((p, i) => (
+            <g key={i}>
+              <line x1={sx(p)} y1={cH} x2={sx(p)} y2={cH + 4} stroke={dim} />
+              <text x={sx(p)} y={cH + 14} textAnchor="middle" fill={i === 0 ? blue : purple} fontSize={8}>
+                {p.toFixed(2)}
+              </text>
+              <text x={sx(p)} y={cH + 24} textAnchor="middle" fill={i === 0 ? blue : purple} fontSize={7}>
+                {i === 0 ? "(Home autarky)" : "(Foreign autarky)"}
+              </text>
+            </g>
+          ))}
+
+          {/* Y axis ticks */}
+          {[rs_low, rs_mid, rs_high].map((r, i) => (
+            <g key={i}>
+              <line x1={0} y1={sy(r)} x2={-4} y2={sy(r)} stroke={dim} />
+              <text x={-6} y={sy(r) + 3} textAnchor="end" fill={dim} fontSize={7.5}>{r.toFixed(2)}</text>
+            </g>
+          ))}
+
+          {/* ── RS CURVE ── */}
+          {/* Segment 1: flat at rs_low from 0 to pLo */}
+          <line x1={sx(0)} y1={sy(rs_low)} x2={x1} y2={sy(rs_low)} stroke={gold} strokeWidth={2.5} />
+
+          {/* Vertical jump at pLo */}
+          <line x1={x1} y1={sy(rs_low)} x2={x1} y2={sy(rs_mid)} stroke={gold} strokeWidth={2.5} />
+
+          {/* Segment 2: flat at rs_mid from pLo to pHi */}
+          <line x1={x1} y1={sy(rs_mid)} x2={x2} y2={sy(rs_mid)} stroke={gold} strokeWidth={2.5} />
+
+          {/* Vertical jump at pHi */}
+          <line x1={x2} y1={sy(rs_mid)} x2={x2} y2={sy(rs_high)} stroke={gold} strokeWidth={2.5} />
+
+          {/* Segment 3: flat at rs_high beyond pHi */}
+          <line x1={x2} y1={sy(rs_high)} x2={cW} y2={sy(rs_high)} stroke={gold} strokeWidth={2.5} />
+
+          {/* ── ANNOTATION LABELS ── */}
+          {/* Segment 1 label */}
+          <text x={sx(pLo * 0.4)} y={sy(rs_low) - 7} textAnchor="middle" fill={blue} fontSize={7}>
+            Only {homeCACloth ? "Foreign" : "Home"} produces cloth
+          </text>
+
+          {/* Segment 2 label */}
+          <text x={sx((pLo + pHi) / 2)} y={sy(rs_mid) - 7} textAnchor="middle" fill={gold} fontSize={7}>
+            Both fully specialize
+          </text>
+          <text x={sx((pLo + pHi) / 2)} y={sy(rs_mid) - 16} textAnchor="middle" fill={dim} fontSize={7}>
+            RS = {rs_mid.toFixed(2)}
+          </text>
+
+          {/* Segment 3 label */}
+          <text x={sx(pHi * 1.2)} y={sy(rs_high) - 7} fill={purple} fontSize={7}>
+            Both produce cloth
+          </text>
+
+          {/* Jump annotations */}
+          <text x={x1 + 4} y={sy((rs_low + rs_mid) / 2)} fill={blue} fontSize={7}>
+            Home indifferent
+          </text>
+          <text x={x2 + 4} y={sy((rs_mid + rs_high) / 2)} fill={purple} fontSize={7}>
+            Foreign indifferent
+          </text>
+
+          {/* Dashed vertical reference lines */}
+          <line x1={x1} y1={0} x2={x1} y2={cH} stroke={blue} strokeWidth={1} strokeDasharray="3,3" opacity={0.4} />
+          <line x1={x2} y1={0} x2={x2} y2={cH} stroke={purple} strokeWidth={1} strokeDasharray="3,3" opacity={0.4} />
+
+          {/* Corner dots */}
+          {[[x1, sy(rs_low)], [x1, sy(rs_mid)], [x2, sy(rs_mid)], [x2, sy(rs_high)]].map(([cx, cy], i) => (
+            <circle key={i} cx={cx} cy={cy} r={3.5} fill={gold} />
+          ))}
+
+          {/* ── RELATIVE DEMAND CURVE ── */}
+          {/* RD: P_cloth/P_wheat = rdElasticity * (Q_wheat/Q_cloth) — downward sloping hyperbola */}
+          {/* Parameterized by expenditure share: if consumers spend θ on cloth, RD: P·Q_c/(P·Q_w) = θ/(1-θ) */}
+          {/* => P_c/P_w = (θ/(1-θ)) * (Q_w/Q_c) — downward sloping in (Q_c/Q_w, P_c/P_w) space */}
+          {(() => {
+            const rdPts = [];
+            const steps = 80;
+            for (let i = 1; i <= steps; i++) {
+              const qRel = (i / steps) * rsMax * 1.8; // Q_cloth/Q_wheat
+              const pRel = rdShare / ((1 - rdShare) * qRel); // P_cloth/P_wheat = (θ/(1-θ)) / (Q_c/Q_w)
+              if (pRel > 0 && pRel <= pMax && qRel <= rsMax * 1.8) {
+                rdPts.push(`${sx(pRel).toFixed(1)},${sy(qRel).toFixed(1)}`);
+              }
+            }
+            // Equilibrium: where RD meets RS flat segment
+            // On flat segment: Q_c/Q_w = rs_mid, so P_eq = rdShare / rs_mid
+            const pEqVal = rdShare / ((1 - rdShare) * rs_mid);
+            const inRange = pEqVal >= pLo && pEqVal <= pHi;
+            const eqX = sx(pEqVal);
+            const eqY = sy(rs_mid);
+
+            return (
+              <>
+                <polyline points={rdPts.join(" ")} fill="none" stroke={green} strokeWidth={2} opacity={0.85} strokeDasharray="5,3" />
+                <text x={sx(pMax * 0.75)} y={sy(rsMax * 0.15)} fill={green} fontSize={7.5}>RD</text>
+                {inRange && (
+                  <>
+                    {/* Equilibrium point */}
+                    <circle cx={eqX} cy={eqY} r={5} fill={green} opacity={0.9} />
+                    <line x1={eqX} y1={eqY} x2={eqX} y2={cH} stroke={green} strokeWidth={1} strokeDasharray="3,2" opacity={0.5} />
+                    <text x={eqX} y={cH + 14} textAnchor="middle" fill={green} fontSize={8} fontWeight="bold">
+                      P*={pEqVal.toFixed(2)}
+                    </text>
+                    <text x={eqX + 6} y={eqY - 8} fill={green} fontSize={7}>
+                      Equilibrium
+                    </text>
+                  </>
+                )}
+                {!inRange && (
+                  <text x={sx(pMax * 0.3)} y={sy(rsMax * 0.7)} fill={green} fontSize={7} opacity={0.7}>
+                    RD intersects outside full-spec. range
+                  </text>
+                )}
+              </>
+            );
+          })()}
+        </g>
+      </svg>
+
+      {/* Key values table */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", marginTop: "0.6rem" }}>
+        {[
+          { label: "Home autarky P", value: pLo.toFixed(2), color: blue },
+          { label: "Equilibrium range", value: `[${pLo.toFixed(2)}, ${pHi.toFixed(2)}]`, color: gold },
+          { label: "Foreign autarky P", value: pHi.toFixed(2), color: purple },
+          { label: "RS below pLo", value: `~${rs_low.toFixed(2)}`, color: dim },
+          { label: "RS between (full spec.)", value: rs_mid.toFixed(2), color: gold },
+          { label: "RS above pHi", value: `~${rs_high.toFixed(2)}`, color: dim },
+          { label: "RD share (θ)", value: rdShare.toFixed(2), color: green },
+          { label: "Eq. price P*", value: (() => { const pe = rdShare / ((1 - rdShare) * rs_mid); return pe >= pLo && pe <= pHi ? pe.toFixed(2) : `${pe.toFixed(2)} (outside range)`; })(), color: green },
+          { label: "Eq. Q_cloth/Q_wheat", value: rs_mid.toFixed(2), color: green },
+        ].map((r, i) => (
+          <div key={i} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", padding: "0.4rem 0.6rem", borderRadius: "2px" }}>
+            <div style={{ fontSize: "0.58rem", color: dim, fontFamily: mono, marginBottom: "0.2rem" }}>{r.label}</div>
+            <div style={{ fontSize: "0.72rem", color: r.color, fontFamily: mono, fontWeight: 600 }}>{r.value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RicardianModel() {
   const [p, setP] = useState({ aLC: 1, aLW: 2, aLCs: 3, aLWs: 1, L: 100, Ls: 100 });
   const set = k => v => setP(prev => ({ ...prev, [k]: v }));
@@ -264,9 +529,10 @@ function RicardianModel() {
               </div>
             </div>
           </div>
-          <div style={{ fontSize: "0.7rem", color: "#5a7a5a", fontStyle: "italic", background: "rgba(90,160,90,0.06)", padding: "0.6rem", borderLeft: "2px solid #3a7a3a" }}>
+          <div style={{ fontSize: "0.7rem", color: "#5a7a5a", fontStyle: "italic", background: "rgba(90,160,90,0.06)", padding: "0.6rem", borderLeft: "2px solid #3a7a3a", marginBottom: "1rem" }}>
             {tradeExists ? `Trade is mutually beneficial. Home specializes in ${homeCA}, Foreign in ${forCA}.` : "Both countries have identical relative productivities — no gains from trade."}
           </div>
+          <RSCurve p={p} homeCA={homeCA} hCloth={hCloth} hWheat={hWheat} fCloth={fCloth} fWheat={fWheat} homeRatio={homeRatio} forRatio={forRatio} tradeExists={tradeExists} />
         </Panel>
       </div>
     </div>
