@@ -2089,7 +2089,8 @@ function AboutPage() {
 
       {/* Footer */}
       <div style={{ borderTop: `1px solid ${border}`, paddingTop: "1.5rem", fontFamily: mono, fontSize: "0.6rem", color: dim, lineHeight: 1.8 }}>
-        <div>Built for SIPA U6401 · International Trade Policy · Columbia University</div>
+        <div style={{ color: text, marginBottom: "0.3rem" }}>Created by <span style={{ color: gold }}>Jon Epstein</span></div>
+        <div>IFEP IA7200 · International Trade · Columbia SIPA · Spring 2026</div>
         <div style={{ marginTop: "0.3rem" }}>
           <a href="https://github.com/jae2185/trade-simulator" target="_blank" rel="noreferrer" style={{ color: blue, textDecoration: "none" }}>github.com/jae2185/trade-simulator</a>
         </div>
