@@ -305,28 +305,31 @@ function StandardModel() {
 
   // Income at trade prices (P_X = ToT, P_Y = 1)
   const tradeIncome = prodX * p.ToT + prodY;
-  // Income if stayed at autarky production point, valued at trade prices
+  // Autarky production valued at trade prices (for production gain calc)
   const autarkyAtTradePrices = autX * p.ToT + autY;
-  // Production gain: always >= 0 (revealed preference)
+  // Production gain: always >= 0 by revealed preference
   const prodGain = Math.max(0, tradeIncome - autarkyAtTradePrices);
 
-  // Consumption: use biased Cobb-Douglas so Good X share = alpha, Good Y share = (1-alpha)
-  // Set alpha so that at autarky (ToT=1), C_X = autX and C_Y = autY
-  // autarky income = autX + autY, so alpha = autX / (autX + autY)
-  const autarkyIncome = autX + autY;
-  const alpha = autX / autarkyIncome; // share of income spent on X
+  // Consumption: Cobb-Douglas with fixed alpha=0.4 (home spends 40% on X, 60% on Y)
+  // This keeps consumption on-chart across all ToT values and ensures
+  // the country imports Y (the good it values more) when ToT is favorable
+  const alpha = 0.4;
   const consX = (alpha * tradeIncome) / p.ToT;
   const consY = (1 - alpha) * tradeIncome;
 
-  const exports_ = Math.max(0, prodX - consX);
-  const imports_ = Math.max(0, consY - prodY);
+  // Clamp consumption to be within chart bounds
+  const consXc = Math.min(consX, p.size * 1.1);
+  const consYc = Math.min(consY, p.size * 1.1);
 
-  // Exchange gain: welfare gain from being able to trade at world prices
-  // = 0.5 * exports * |ToT - 1| (area of the exchange triangle)
+  const exports_ = Math.max(0, prodX - consXc);
+  const imports_ = Math.max(0, consYc - prodY);
+
+  // Exchange gain
   const exchGain = Math.max(0, 0.5 * Math.abs(p.ToT - 1.0) * exports_);
 
   const totalGain = prodGain + exchGain;
-  const welfareGainPct = (totalGain / autarkyAtTradePrices) * 100;
+  const autarkyIncome = autX + autY;
+  const welfareGainPct = (totalGain / autarkyIncome) * 100;
 
   const nPts = 80;
   const ppfPoints = Array.from({ length: nPts + 1 }, (_, i) => ({ x: (i / nPts) * p.size, y: ppf((i / nPts) * p.size) }));
@@ -356,7 +359,7 @@ function StandardModel() {
         <Panel title="Equilibrium & Welfare">
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
             <Stat label="Production (Q_X, Q_Y)" value={`(${prodX.toFixed(1)}, ${prodY.toFixed(1)})`} highlight />
-            <Stat label="Consumption (C_X, C_Y)" value={`(${consX.toFixed(1)}, ${consY.toFixed(1)})`} />
+            <Stat label="Consumption (C_X, C_Y)" value={`(${consXc.toFixed(1)}, ${consYc.toFixed(1)})`} />
             <Stat label="Exports (Good X)" value={exports_.toFixed(1)} />
             <Stat label="Imports (Good Y)" value={imports_.toFixed(1)} />
           </div>
@@ -395,8 +398,8 @@ function StandardModel() {
               // Exchange gain triangle: between prod and cons points
               const triExch = [
                 `${sx(prodX)},${sy(prodY)}`,
-                `${sx(consX)},${sy(prodY)}`,
-                `${sx(consX)},${sy(consY)}`
+                `${sx(consXc)},${sy(prodY)}`,
+                `${sx(consXc)},${sy(consYc)}`
               ].join(" ");
 
               // Autarky budget line (slope = -1 through autarky point)
@@ -422,15 +425,15 @@ function StandardModel() {
                   )}
                   <circle cx={sx(prodX)} cy={sy(prodY)} r={6} fill="#e2c97e" />
                   <text x={sx(prodX) + 8} y={sy(prodY) + 4} fill="#e2c97e" fontSize={8}>Prod.</text>
-                  <circle cx={sx(consX)} cy={sy(consY)} r={6} fill="#7fe87f" />
-                  <text x={sx(consX) + 6} y={sy(consY) - 6} fill="#7fe87f" fontSize={8}>Cons.</text>
-                  <line x1={sx(consX)} y1={sy(consY)} x2={sx(prodX)} y2={sy(consY)} stroke="#e87f7f" strokeWidth={1.5} opacity={0.7} />
-                  <line x1={sx(prodX)} y1={sy(consY)} x2={sx(prodX)} y2={sy(prodY)} stroke="#e87f7f" strokeWidth={1.5} opacity={0.7} />
+                  <circle cx={sx(consXc)} cy={sy(consYc)} r={6} fill="#7fe87f" />
+                  <text x={sx(consXc) + 6} y={sy(consYc) - 6} fill="#7fe87f" fontSize={8}>Cons.</text>
+                  <line x1={sx(consXc)} y1={sy(consYc)} x2={sx(prodX)} y2={sy(consYc)} stroke="#e87f7f" strokeWidth={1.5} opacity={0.7} />
+                  <line x1={sx(prodX)} y1={sy(consYc)} x2={sx(prodX)} y2={sy(prodY)} stroke="#e87f7f" strokeWidth={1.5} opacity={0.7} />
                   {prodGain > 0.5 && (
                     <text x={sx((autX + prodX) / 2)} y={sy(Math.max(autY, prodY)) - 5} fill="#e2c97e" fontSize={7} textAnchor="middle" opacity={0.8}>Prod. gain</text>
                   )}
                   {exchGain > 0.5 && (
-                    <text x={sx((prodX + consX) / 2)} y={sy((prodY + consY) / 2)} fill="#7fe87f" fontSize={7} textAnchor="middle" opacity={0.8}>Exch. gain</text>
+                    <text x={sx((prodX + consXc) / 2)} y={sy((prodY + consYc) / 2)} fill="#7fe87f" fontSize={7} textAnchor="middle" opacity={0.8}>Exch. gain</text>
                   )}
                 </>
               );
