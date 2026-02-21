@@ -914,7 +914,7 @@ function RicardianModel() {
   const yMax = Math.max(hWheat, fWheat) * 1.1;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+    <div className="sim-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
       <div>
         <Explainer>
           <strong style={{ color: "#c8d8e8" }}>The Ricardian Model</strong> (Ricardo, 1817) shows that trade is driven by <em>comparative</em> advantage, not absolute advantage. Even if one country is more productive at everything, both gain by specializing where their relative productivity advantage is greatest.
@@ -1985,12 +1985,126 @@ const MODELS = [
   { id: "melitz", label: "Melitz", subtitle: "Firm Heterogeneity", Component: MelitzModel },
 ];
 
+
+function AboutPage() {
+  const mono = "'IBM Plex Mono', monospace";
+  const gold = "#e2c97e";
+  const blue = "#4a9fe8";
+  const dim = "#3a5a7a";
+  const text = "#c8d8e8";
+  const border = "rgba(255,255,255,0.07)";
+
+  const models = [
+    { name: "Ricardian Model", year: "1817", desc: "Comparative advantage from differences in labor productivity. Derives the wage ratio bounds for mutually beneficial trade, real wages, and the many-good chain of specialization.", icon: "⚖" },
+    { name: "Heckscher-Ohlin", year: "1919–33", desc: "Trade patterns from factor endowment differences. Includes Stolper-Samuelson (who wins/loses from trade opening), Rybczynski (factor accumulation effects), and Factor Price Equalization.", icon: "🔩" },
+    { name: "Standard Trade Model", year: "Krugman & Obstfeld", desc: "Generalizes Ricardo and H-O with a bowed-out PPF and terms of trade. Shows production and consumption points, indifference curves, and decomposes welfare gains into production gain and exchange gain.", icon: "📈" },
+    { name: "New Trade Theory", year: "Krugman 1980", desc: "Intra-industry trade from economies of scale and love of variety (CES preferences). Models the home market effect: larger countries attract disproportionately more varieties.", icon: "🌐" },
+    { name: "Melitz Model", year: "2003", desc: "Firm heterogeneity in trade. Only firms above the productivity cutoff φ* survive; only the most productive pay the fixed export cost. Predicts trade liberalization raises aggregate productivity through selection.", icon: "🏭" },
+  ];
+
+  return (
+    <div style={{ maxWidth: 820, margin: "0 auto", padding: "3rem 2rem" }}>
+      {/* Hero */}
+      <div style={{ marginBottom: "3.5rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.62rem", letterSpacing: "0.2em", color: dim, marginBottom: "0.8rem" }}>
+          COLUMBIA SIPA · INTERNATIONAL FINANCE & ECONOMIC POLICY
+        </div>
+        <h1 style={{ fontSize: "2.2rem", fontWeight: 300, color: gold, letterSpacing: "0.04em", margin: "0 0 0.8rem", lineHeight: 1.2 }}>
+          International Trade<br />Model Simulator
+        </h1>
+        <p style={{ fontFamily: mono, fontSize: "0.82rem", color: "#8a9bb0", lineHeight: 1.9, maxWidth: 600, margin: "0 0 1.5rem" }}>
+          An interactive implementation of the five canonical models of international trade theory — from Ricardo's 1817 comparative advantage framework through Melitz's 2003 heterogeneous-firms model. Built to support graduate coursework in international economics and to make abstract theory visually tractable.
+        </p>
+        <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
+          <a href="/" style={{
+            fontFamily: mono, fontSize: "0.72rem", letterSpacing: "0.08em",
+            padding: "0.6rem 1.4rem", background: "none",
+            border: `1px solid ${gold}`, color: gold, borderRadius: "2px", textDecoration: "none",
+            transition: "all 0.15s",
+          }}>EXPLORE MODELS ▸</a>
+          <a href="/game" style={{
+            fontFamily: mono, fontSize: "0.72rem", letterSpacing: "0.08em",
+            padding: "0.6rem 1.4rem", background: "none",
+            border: `1px solid ${blue}`, color: blue, borderRadius: "2px", textDecoration: "none",
+          }}>PLAY STATECRAFT ▸</a>
+        </div>
+      </div>
+
+      {/* Models */}
+      <div style={{ marginBottom: "3rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.18em", color: dim, marginBottom: "1.2rem" }}>IMPLEMENTED MODELS</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+          {models.map((m, i) => (
+            <div key={i} style={{ display: "flex", gap: "1.2rem", padding: "1rem 1.2rem", background: "rgba(255,255,255,0.02)", border: `1px solid ${border}`, borderRadius: "2px", alignItems: "flex-start" }}>
+              <div style={{ fontSize: "1.4rem", flexShrink: 0, marginTop: "0.1rem" }}>{m.icon}</div>
+              <div>
+                <div style={{ display: "flex", gap: "0.8rem", alignItems: "baseline", marginBottom: "0.3rem", flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: mono, fontSize: "0.78rem", color: text, fontWeight: 600 }}>{m.name}</span>
+                  <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>{m.year}</span>
+                </div>
+                <p style={{ fontFamily: mono, fontSize: "0.68rem", color: "#5a7a9a", lineHeight: 1.7, margin: 0 }}>{m.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Statecraft */}
+      <div style={{ marginBottom: "3rem", padding: "1.5rem", background: "rgba(226,201,126,0.04)", border: `1px solid rgba(226,201,126,0.15)`, borderRadius: "2px" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.18em", color: dim, marginBottom: "0.8rem" }}>ECONOMIC STATECRAFT — STRATEGY SIMULATION</div>
+        <p style={{ fontFamily: mono, fontSize: "0.75rem", color: "#8a9bb0", lineHeight: 1.8, margin: "0 0 1rem" }}>
+          A turn-based trade policy simulation in which you play as Minister of Trade for Cascadia, a mid-sized open economy navigating a multipolar world. Each AI country has a distinct behavioral personality (Hegemon, Rising Power, Diplomatic Bloc, Volatile Market) derived from the structural features of the economies they represent.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.5rem", fontFamily: mono, fontSize: "0.65rem" }}>
+          {[
+            "Optimal tariff theory (t* = 1/(ε−1))",
+            "Viner trade diversion",
+            "Stolper-Samuelson retaliation",
+            "Currency war & counter-depreciation",
+            "Sanctions coalition dynamics",
+            "Krugman variety effects from FTAs",
+          ].map((f, i) => (
+            <div key={i} style={{ color: dim, padding: "0.3rem 0", borderLeft: `2px solid rgba(226,201,126,0.25)`, paddingLeft: "0.6rem" }}>{f}</div>
+          ))}
+        </div>
+      </div>
+
+      {/* Technical */}
+      <div style={{ marginBottom: "3rem" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.18em", color: dim, marginBottom: "0.8rem" }}>TECHNICAL</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+          {[
+            ["Stack", "React · Vite · Vercel"],
+            ["Charts", "Custom SVG (no charting library)"],
+            ["Models", "All equations implemented from scratch"],
+            ["Data", "No external APIs — fully parametric"],
+          ].map(([k, v], i) => (
+            <div key={i} style={{ fontFamily: mono, fontSize: "0.68rem", padding: "0.5rem 0.8rem", background: "rgba(255,255,255,0.02)", border: `1px solid ${border}`, borderRadius: "2px" }}>
+              <span style={{ color: dim }}>{k}: </span>
+              <span style={{ color: text }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ borderTop: `1px solid ${border}`, paddingTop: "1.5rem", fontFamily: mono, fontSize: "0.6rem", color: dim, lineHeight: 1.8 }}>
+        <div>Built for SIPA U6401 · International Trade Policy · Columbia University</div>
+        <div style={{ marginTop: "0.3rem" }}>
+          <a href="https://github.com/jae2185/trade-simulator" target="_blank" rel="noreferrer" style={{ color: blue, textDecoration: "none" }}>github.com/jae2185/trade-simulator</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Nav() {
   const loc = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
   const linkStyle = (path) => ({
     borderBottom: `2px solid ${loc.pathname === path ? "#e2c97e" : "transparent"}`,
     color: loc.pathname === path ? "#e2c97e" : "#3a5a7a",
-    padding: "1.2rem 1.2rem",
+    padding: "1.2rem 1rem",
     fontFamily: "'IBM Plex Mono', monospace",
     fontSize: "0.72rem",
     letterSpacing: "0.06em",
@@ -1998,15 +2112,41 @@ function Nav() {
     display: "flex",
     alignItems: "center",
     transition: "color 0.15s",
+    whiteSpace: "nowrap",
   });
   return (
-    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 2rem", display: "flex", alignItems: "stretch" }}>
-      <div style={{ padding: "1.2rem 2rem 1.2rem 0", marginRight: "1rem", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ fontSize: "1.1rem", fontWeight: 300, letterSpacing: "0.05em", color: "#e2c97e" }}>International Trade</div>
-        <div style={{ fontSize: "0.65rem", color: "#3a5a7a", letterSpacing: "0.15em", textTransform: "uppercase", fontFamily: "'IBM Plex Mono', monospace" }}>Economic Simulator</div>
+    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 1.5rem", display: "flex", alignItems: "stretch", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "stretch" }}>
+        <div style={{ padding: "1rem 1.5rem 1rem 0", marginRight: "0.5rem", borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div style={{ fontSize: "1rem", fontWeight: 300, letterSpacing: "0.05em", color: "#e2c97e", lineHeight: 1.2 }}>International Trade</div>
+          <div style={{ fontSize: "0.58rem", color: "#3a5a7a", letterSpacing: "0.15em", textTransform: "uppercase", fontFamily: "'IBM Plex Mono', monospace" }}>Economic Simulator</div>
+        </div>
+        <div className="nav-links" style={{ display: "flex", alignItems: "stretch" }}>
+          <Link to="/" style={linkStyle("/")}>MODELS</Link>
+          <Link to="/game" style={linkStyle("/game")}>STATECRAFT ▸</Link>
+          <Link to="/about" style={linkStyle("/about")}>ABOUT</Link>
+        </div>
       </div>
-      <Link to="/" style={linkStyle("/")}>MODELS</Link>
-      <Link to="/game" style={linkStyle("/game")}>STATECRAFT ▸</Link>
+      {/* Mobile hamburger */}
+      <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)} style={{
+        display: "none", background: "none", border: "none", color: "#e2c97e",
+        fontFamily: "'IBM Plex Mono', monospace", fontSize: "1.1rem", cursor: "pointer", padding: "0 0.5rem",
+      }}>☰</button>
+      {/* Mobile dropdown */}
+      {menuOpen && (
+        <div className="nav-mobile-menu" style={{
+          position: "absolute", top: "60px", left: 0, right: 0, zIndex: 100,
+          background: "#0d1520", borderBottom: "1px solid rgba(255,255,255,0.08)",
+          display: "flex", flexDirection: "column", padding: "0.5rem 1.5rem 1rem",
+        }}>
+          {[["/" , "MODELS"], ["/game", "STATECRAFT ▸"], ["/about", "ABOUT"]].map(([path, label]) => (
+            <Link key={path} to={path} onClick={() => setMenuOpen(false)} style={{
+              fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.8rem", color: loc.pathname === path ? "#e2c97e" : "#5a7a9a",
+              padding: "0.7rem 0", borderBottom: "1px solid rgba(255,255,255,0.04)", textDecoration: "none",
+            }}>{label}</Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2049,11 +2189,21 @@ export default function App() {
         * { box-sizing: border-box; }
         a { text-decoration: none; }
         ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #0d1520; } ::-webkit-scrollbar-thumb { background: #2a3a4a; }
+        .nav-links { display: flex !important; }
+        .nav-hamburger { display: none !important; }
+        .sim-grid { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 700px) {
+          .nav-links { display: none !important; }
+          .nav-hamburger { display: flex !important; }
+          .sim-grid { grid-template-columns: 1fr !important; }
+          .about-tech-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
       <Nav />
       <Routes>
         <Route path="/" element={<SimulatorPage />} />
         <Route path="/game" element={<EconomicStatecraft />} />
+        <Route path="/about" element={<AboutPage />} />
       </Routes>
     </div>
   );
