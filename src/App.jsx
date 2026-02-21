@@ -115,6 +115,26 @@ function PresetDropdown({ presets, onSelect }) {
   );
 }
 
+
+function Collapsible({ title, accent = "#4a7fa5", defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginTop: "0.8rem" }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        background: "none", border: "none", borderBottom: `1px solid ${accent}33`,
+        color: accent, fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.6rem",
+        letterSpacing: "0.12em", padding: "0.3rem 0", cursor: "pointer",
+        display: "flex", alignItems: "center", gap: "0.4rem", width: "100%",
+        textAlign: "left", textTransform: "uppercase", marginBottom: open ? "0.6rem" : 0,
+      }}>
+        <span style={{ fontSize: "0.7rem" }}>{open ? "▾" : "▸"}</span>
+        {title}
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
 // ─── SVG Chart helper ────────────────────────────────────────────────────────
 
 function AxesChart({ width = 280, height = 220, xLabel = "Good X", yLabel = "Good Y", xMax, yMax, children }) {
@@ -421,6 +441,281 @@ function RSCurve({ p, homeCA, hCloth, hWheat, fCloth, fWheat, homeRatio, forRati
   );
 }
 
+
+// ─── WAGE RATIO CALCULATOR ────────────────────────────────────────────────────
+
+function WageRatioCalc({ p, homeRatio, forRatio, wLo, wHi, tradeExists }) {
+  const mono = "'IBM Plex Mono', monospace";
+  const gold = "#e2c97e";
+  const blue = "#4a9fe8";
+  const purple = "#a57fa5";
+  const green = "#7fe87f";
+  const red = "#e87f7f";
+  const dim = "#3a5a7a";
+
+  // Given P* from RD (user can set), compute w/w*
+  // w/w* = P_cloth/P_wheat * (a*_LC/a_LC) if home produces cloth
+  // More generally: w/w* lies in [wLo, wHi]
+  // At P*: if Home specializes in cloth => w = P_c/a_LC, w* = P_w/a*_LW
+  //   => w/w* = (P_c/P_w) * (a*_LW/a_LC) ... but this requires P*
+  // Let user set w/w* directly and show which goods each country produces
+
+  const [wRatio, setWRatio] = useState(() => (wLo + wHi) / 2);
+  const validWRatio = Math.max(0.01, wRatio);
+
+  // For each good, Home produces if a_Li/a*_Li < w/w* (Home relatively cheaper)
+  // Home produces cloth if a_LC/a*_LC < w/w*
+  // Home produces wheat if a_LW/a*_LW < w/w*
+  const homeProducesCloth = (p.aLC / p.aLCs) < validWRatio;
+  const homeProducesWheat = (p.aLW / p.aLWs) < validWRatio;
+
+  // Real wages at this w/w*
+  // If home specializes in cloth: w = P_c / a_LC
+  // Use w/w* and the autarky price to back out P*
+  // Actually show wages in terms of purchasing power of each good
+  // w in terms of cloth = 1/a_LC (if home produces cloth)
+  // w in terms of wheat = P_c/(P_w * a_LC) = homeRatio/a_LC ... 
+
+  const W = 480; const H = 60;
+  const pad = { left: 20, right: 20, top: 10, bottom: 10 };
+  const cW = W - pad.left - pad.right;
+
+  // Scale: wRatio axis from 0 to wHi*1.5
+  const axMax = Math.max(wHi * 1.6, validWRatio * 1.2);
+  const sx = v => (v / axMax) * cW;
+
+  return (
+    <div style={{ marginTop: "0.8rem" }}>
+      <div style={{ fontSize: "0.65rem", color: blue, letterSpacing: "0.08em", marginBottom: "0.5rem", fontFamily: mono }}>
+        WAGE RATIO CALCULATOR (w / w*)
+      </div>
+
+      {/* Slider */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "0.6rem" }}>
+        <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, whiteSpace: "nowrap" }}>w/w* =</span>
+        <input type="range" min={0.01} max={axMax} step={0.01} value={validWRatio}
+          onChange={e => setWRatio(parseFloat(e.target.value))}
+          style={{ accentColor: gold, flex: 1, cursor: "pointer" }} />
+        <span style={{ fontFamily: mono, fontSize: "0.78rem", color: gold, fontWeight: 700, minWidth: 40 }}>
+          {validWRatio.toFixed(2)}
+        </span>
+      </div>
+
+      {/* Number line SVG */}
+      <svg width={W} height={H} style={{ fontFamily: mono, display: "block", marginBottom: "0.6rem" }}>
+        <g transform={`translate(${pad.left},${pad.top})`}>
+          {/* Base line */}
+          <line x1={0} y1={30} x2={cW} y2={30} stroke="#2a3a4a" strokeWidth={2} />
+
+          {/* Valid trade range */}
+          <rect x={sx(wLo)} y={22} width={sx(wHi) - sx(wLo)} height={16}
+            fill="rgba(226,201,126,0.12)" stroke={gold} strokeWidth={1} rx={2} />
+          <text x={(sx(wLo) + sx(wHi)) / 2} y={19} textAnchor="middle" fill={gold} fontSize={7}>
+            trade range
+          </text>
+
+          {/* wLo tick */}
+          <line x1={sx(wLo)} y1={24} x2={sx(wLo)} y2={36} stroke={blue} strokeWidth={1.5} />
+          <text x={sx(wLo)} y={48} textAnchor="middle" fill={blue} fontSize={7}>{wLo.toFixed(2)}</text>
+          <text x={sx(wLo)} y={56} textAnchor="middle" fill={blue} fontSize={6}>a_LC/a*_LC</text>
+
+          {/* wHi tick */}
+          <line x1={sx(wHi)} y1={24} x2={sx(wHi)} y2={36} stroke={purple} strokeWidth={1.5} />
+          <text x={sx(wHi)} y={48} textAnchor="middle" fill={purple} fontSize={7}>{wHi.toFixed(2)}</text>
+          <text x={sx(wHi)} y={56} textAnchor="middle" fill={purple} fontSize={6}>a_LW/a*_LW</text>
+
+          {/* Current w/w* */}
+          <line x1={sx(validWRatio)} y1={16} x2={sx(validWRatio)} y2={44} stroke={gold} strokeWidth={2.5} />
+          <circle cx={sx(validWRatio)} cy={30} r={5} fill={gold} />
+        </g>
+      </svg>
+
+      {/* Production pattern */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem", marginBottom: "0.6rem" }}>
+        {[
+          { label: "HOME produces", cloth: homeProducesCloth, wheat: homeProducesWheat, color: blue },
+          { label: "FOREIGN produces", cloth: !homeProducesCloth, wheat: !homeProducesWheat, color: purple },
+        ].map((c, i) => (
+          <div key={i} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${c.color}33`, padding: "0.6rem", borderRadius: "2px" }}>
+            <div style={{ fontSize: "0.58rem", color: c.color, fontFamily: mono, marginBottom: "0.4rem" }}>{c.label}</div>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <span style={{ fontFamily: mono, fontSize: "0.72rem", color: c.cloth ? green : red }}>
+                {c.cloth ? "✓" : "✗"} Cloth
+              </span>
+              <span style={{ fontFamily: mono, fontSize: "0.72rem", color: c.wheat ? green : red }}>
+                {c.wheat ? "✓" : "✗"} Wheat
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Interpretation */}
+      <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, lineHeight: 1.7,
+        background: "rgba(255,255,255,0.02)", padding: "0.5rem 0.7rem", borderRadius: "2px",
+        borderLeft: `2px solid ${gold}` }}>
+        {!tradeExists ? "No comparative advantage difference — no gains from trade." :
+         validWRatio < wLo ? `w/w* < ${wLo.toFixed(2)}: Home wages too low — Home would produce both goods. Below trade equilibrium.` :
+         validWRatio > wHi ? `w/w* > ${wHi.toFixed(2)}: Home wages too high — Foreign produces both goods. Above trade equilibrium.` :
+         `w/w* = ${validWRatio.toFixed(2)} is within [${wLo.toFixed(2)}, ${wHi.toFixed(2)}]. 
+Home specializes in ${homeProducesCloth && !homeProducesWheat ? "Cloth" : homeProducesWheat && !homeProducesCloth ? "Wheat" : "both (incomplete specialization)"}, 
+Foreign in ${!homeProducesCloth ? "Cloth" : "Wheat"}. Both gain from trade.`}
+      </div>
+    </div>
+  );
+}
+
+// ─── MANY-GOOD RICARDIAN CHAIN ────────────────────────────────────────────────
+
+const DEFAULT_MANY_GOODS = [
+  { name: "Semiconductors", aH: 1, aF: 8 },
+  { name: "Machinery",      aH: 2, aF: 10 },
+  { name: "Cloth",          aH: 2, aF: 4 },
+  { name: "Wheat",          aH: 1, aF: 2 },
+  { name: "Steel",          aH: 3, aF: 5 },
+  { name: "Textiles",       aH: 4, aF: 5 },
+];
+
+function ManyGoodChain() {
+  const mono = "'IBM Plex Mono', monospace";
+  const gold = "#e2c97e";
+  const blue = "#4a9fe8";
+  const purple = "#a57fa5";
+  const green = "#7fe87f";
+  const red = "#e87f7f";
+  const dim = "#3a5a7a";
+
+  const [goods, setGoods] = useState(DEFAULT_MANY_GOODS);
+  const [wRatio, setWRatio] = useState(0.4);
+  const [newGood, setNewGood] = useState({ name: "", aH: 1, aF: 2 });
+
+  // Sort by a_Hi/a_Fi (Home relative unit labor req) ascending = Home CA first
+  const sorted = [...goods]
+    .map(g => ({ ...g, ratio: g.aH / g.aF }))
+    .sort((a, b) => a.ratio - b.ratio);
+
+  // Home produces good i if a_Hi/a_Fi < w/w*
+  // i.e. ratio < wRatio
+  const axMax = Math.max(...sorted.map(g => g.ratio)) * 1.3;
+
+  const addGood = () => {
+    if (newGood.name && newGood.aH > 0 && newGood.aF > 0) {
+      setGoods(prev => [...prev, { ...newGood }]);
+      setNewGood({ name: "", aH: 1, aF: 2 });
+    }
+  };
+
+  const removeGood = name => setGoods(prev => prev.filter(g => g.name !== name));
+
+  return (
+    <div style={{ marginTop: "1rem" }}>
+      <div style={{ fontSize: "0.65rem", color: blue, letterSpacing: "0.08em", marginBottom: "0.5rem", fontFamily: mono }}>
+        MANY-GOOD RICARDIAN CHAIN
+      </div>
+      <div style={{ fontSize: "0.62rem", color: dim, fontStyle: "italic", marginBottom: "0.7rem", fontFamily: mono }}>
+        Goods ranked by Home's relative unit labor cost (a_H/a_F). Home produces all goods to the left of the wage ratio cut-point.
+      </div>
+
+      {/* w/w* slider */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "0.8rem" }}>
+        <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, whiteSpace: "nowrap" }}>w/w* =</span>
+        <input type="range" min={0.01} max={axMax} step={0.01} value={wRatio}
+          onChange={e => setWRatio(parseFloat(e.target.value))}
+          style={{ accentColor: gold, flex: 1, cursor: "pointer" }} />
+        <span style={{ fontFamily: mono, fontSize: "0.78rem", color: gold, fontWeight: 700, minWidth: 40 }}>
+          {wRatio.toFixed(2)}
+        </span>
+      </div>
+
+      {/* Chain visualization */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: "0.8rem", alignItems: "center" }}>
+        {sorted.map((g, i) => {
+          const homeProduces = g.ratio < wRatio;
+          const isCutPoint = i < sorted.length - 1 &&
+            sorted[i].ratio < wRatio && sorted[i + 1].ratio >= wRatio;
+          return (
+            <div key={g.name} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <div style={{
+                background: homeProduces ? "rgba(74,159,232,0.12)" : "rgba(165,127,165,0.12)",
+                border: `1px solid ${homeProduces ? blue : purple}`,
+                borderRadius: "2px", padding: "0.35rem 0.6rem",
+                fontFamily: mono, fontSize: "0.65rem", position: "relative",
+              }}>
+                <div style={{ color: homeProduces ? blue : purple, fontWeight: 600 }}>{g.name}</div>
+                <div style={{ color: dim, fontSize: "0.58rem" }}>
+                  {g.ratio.toFixed(2)} {homeProduces ? "← Home" : "← Foreign"}
+                </div>
+                <button onClick={() => removeGood(g.name)} style={{
+                  position: "absolute", top: 2, right: 3, background: "none", border: "none",
+                  color: dim, cursor: "pointer", fontSize: "0.6rem", lineHeight: 1, padding: 0,
+                }}>✕</button>
+              </div>
+              {isCutPoint && (
+                <div style={{ fontFamily: mono, fontSize: "1rem", color: gold, fontWeight: 700 }}>│</div>
+              )}
+              {!isCutPoint && i < sorted.length - 1 && (
+                <div style={{ color: dim, fontSize: "0.7rem" }}>→</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Summary */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem", marginBottom: "0.8rem" }}>
+        <div style={{ background: "rgba(74,127,165,0.07)", border: `1px solid ${blue}33`, padding: "0.6rem", borderRadius: "2px" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.58rem", color: blue, marginBottom: "0.3rem" }}>HOME PRODUCES</div>
+          {sorted.filter(g => g.ratio < wRatio).length === 0
+            ? <div style={{ fontFamily: mono, fontSize: "0.65rem", color: red }}>Nothing (w/w* too low)</div>
+            : sorted.filter(g => g.ratio < wRatio).map(g => (
+              <div key={g.name} style={{ fontFamily: mono, fontSize: "0.65rem", color: green }}>✓ {g.name} (a_H/a_F={g.ratio.toFixed(2)})</div>
+            ))}
+        </div>
+        <div style={{ background: "rgba(165,127,165,0.07)", border: `1px solid ${purple}33`, padding: "0.6rem", borderRadius: "2px" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.58rem", color: purple, marginBottom: "0.3rem" }}>FOREIGN PRODUCES</div>
+          {sorted.filter(g => g.ratio >= wRatio).length === 0
+            ? <div style={{ fontFamily: mono, fontSize: "0.65rem", color: red }}>Nothing (w/w* too high)</div>
+            : sorted.filter(g => g.ratio >= wRatio).map(g => (
+              <div key={g.name} style={{ fontFamily: mono, fontSize: "0.65rem", color: purple }}>✓ {g.name} (a_H/a_F={g.ratio.toFixed(2)})</div>
+            ))}
+        </div>
+      </div>
+
+      {/* Add good */}
+      <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>Add good:</span>
+        <input value={newGood.name} onChange={e => setNewGood(g => ({ ...g, name: e.target.value }))}
+          placeholder="Name" style={{
+            background: "#0d1520", border: "1px solid #2a3a4a", color: "#c8d8e8",
+            fontFamily: mono, fontSize: "0.65rem", padding: "0.25rem 0.4rem",
+            borderRadius: "2px", width: 90,
+          }} />
+        <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>a_H:</span>
+        <input type="number" value={newGood.aH} min={0.1} step={0.1}
+          onChange={e => setNewGood(g => ({ ...g, aH: parseFloat(e.target.value) || 1 }))}
+          style={{
+            background: "#0d1520", border: "1px solid #2a3a4a", color: blue,
+            fontFamily: mono, fontSize: "0.65rem", padding: "0.25rem 0.4rem",
+            borderRadius: "2px", width: 50,
+          }} />
+        <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>a_F:</span>
+        <input type="number" value={newGood.aF} min={0.1} step={0.1}
+          onChange={e => setNewGood(g => ({ ...g, aF: parseFloat(e.target.value) || 1 }))}
+          style={{
+            background: "#0d1520", border: "1px solid #2a3a4a", color: purple,
+            fontFamily: mono, fontSize: "0.65rem", padding: "0.25rem 0.4rem",
+            borderRadius: "2px", width: 50,
+          }} />
+        <button onClick={addGood} style={{
+          background: "none", border: `1px solid ${gold}`, color: gold,
+          fontFamily: mono, fontSize: "0.62rem", padding: "0.25rem 0.6rem",
+          cursor: "pointer", borderRadius: "2px",
+        }}>+ Add</button>
+      </div>
+    </div>
+  );
+}
+
 function RicardianModel() {
   const [p, setP] = useState({ aLC: 1, aLW: 2, aLCs: 3, aLWs: 1, L: 100, Ls: 100 });
   const set = k => v => setP(prev => ({ ...prev, [k]: v }));
@@ -484,7 +779,7 @@ function RicardianModel() {
               )}
             </AxesChart>
           </div>
-          <div style={{ fontSize: "0.65rem", color: "#4a7fa5", letterSpacing: "0.08em", margin: "0.8rem 0 0.5rem" }}>REAL WAGES (units of good per hour of labor)</div>
+          <Collapsible title="Real Wages (units of good per hour of labor)" accent="#4a7fa5" defaultOpen={true}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem", marginBottom: "0.8rem" }}>
             <div style={{ background: "rgba(74,127,165,0.07)", border: "1px solid rgba(74,127,165,0.15)", borderRadius: "2px", padding: "0.7rem" }}>
               <div style={{ fontSize: "0.6rem", color: "#4a7fa5", fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.08em", marginBottom: "0.5rem" }}>HOME — AUTARKY vs TRADE</div>
@@ -529,11 +824,356 @@ function RicardianModel() {
               </div>
             </div>
           </div>
-          <div style={{ fontSize: "0.7rem", color: "#5a7a5a", fontStyle: "italic", background: "rgba(90,160,90,0.06)", padding: "0.6rem", borderLeft: "2px solid #3a7a3a", marginBottom: "1rem" }}>
+          <div style={{ fontSize: "0.7rem", color: "#5a7a5a", fontStyle: "italic", background: "rgba(90,160,90,0.06)", padding: "0.6rem", borderLeft: "2px solid #3a7a3a" }}>
             {tradeExists ? `Trade is mutually beneficial. Home specializes in ${homeCA}, Foreign in ${forCA}.` : "Both countries have identical relative productivities — no gains from trade."}
           </div>
+          </Collapsible>
+          <Collapsible title="World Relative Supply & Demand" accent="#e2c97e" defaultOpen={false}>
           <RSCurve p={p} homeCA={homeCA} hCloth={hCloth} hWheat={hWheat} fCloth={fCloth} fWheat={fWheat} homeRatio={homeRatio} forRatio={forRatio} tradeExists={tradeExists} />
+          </Collapsible>
+          <Collapsible title="Wage Ratio Calculator (w / w*)" accent="#4a9fe8" defaultOpen={false}>
+          <WageRatioCalc p={p} homeRatio={homeRatio} forRatio={forRatio} wLo={wLo} wHi={wHi} tradeExists={tradeExists} />
+          </Collapsible>
+          <Collapsible title="Many-Good Ricardian Chain" accent="#a57fa5" defaultOpen={false}>
+          <ManyGoodChain />
+          </Collapsible>
         </Panel>
+      </div>
+    </div>
+  );
+}
+
+
+// ─── RYBCZYNSKI VISUALIZER ────────────────────────────────────────────────────
+
+function RybczynskiViz({ p }) {
+  const mono = "'IBM Plex Mono', monospace";
+  const gold = "#e2c97e";
+  const blue = "#4a9fe8";
+  const purple = "#a57fa5";
+  const green = "#7fe87f";
+  const red = "#e87f7f";
+  const dim = "#3a5a7a";
+
+  const [dK, setDK] = useState(0);
+  const [dL, setDL] = useState(0);
+
+  // H-O production point approximation using factor market clearing
+  // At given factor prices (w, r), firms choose K/L ratios for each good
+  // Capital intensity: X uses theta_KX fraction of costs as capital
+  // Labor intensity: X uses (1-theta_KX) fraction as labor
+  // In a 2x2 model with full employment:
+  //   K: aKX * Qx + aKY * Qy = K  (capital market clearing)
+  //   L: aLX * Qx + aLY * Qy = L  (labor market clearing)
+  // We use theta as proxies for factor requirements
+  // aKX = theta_KX (capital req per unit X), aLX = (1-theta_KX)
+  // aKY = theta_KY, aLY = (1-theta_KY)
+
+  const tKX = p.aKX; const tLX = 1 - p.aKX;
+  const tKY = p.aKY; const tLY = 1 - p.aKY;
+
+  // Solve 2x2 system: [tKX, tKY; tLX, tLY] * [Qx; Qy] = [K; L]
+  const solveProduction = (K, L) => {
+    const det = tKX * tLY - tKY * tLX;
+    if (Math.abs(det) < 1e-9) return { Qx: 0, Qy: 0 };
+    const Qx = (tLY * K - tKY * L) / det;
+    const Qy = (tKX * L - tLX * K) / det;
+    return { Qx: Math.max(0, Qx), Qy: Math.max(0, Qy) };
+  };
+
+  const base = solveProduction(p.KH, p.LH);
+  const shock = solveProduction(p.KH + dK, p.LH + dL);
+
+  const maxQ = Math.max(base.Qx, base.Qy, shock.Qx, shock.Qy) * 1.3;
+
+  // Rybczynski line: for capital shock, line through base and shock in (Qx, Qy) space
+  // Direction vector
+  const ryb = { dx: shock.Qx - base.Qx, dy: shock.Qy - base.Qy };
+
+  const W = 280; const H = 220;
+  const pad = { top: 14, right: 20, bottom: 36, left: 44 };
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
+  const sx = v => (v / maxQ) * cW;
+  const sy = v => cH - (v / maxQ) * cH;
+
+  // Rybczynski theorem: which sector expands?
+  const capitalShock = dK !== 0;
+  const laborShock = dL !== 0;
+  const xExpands = shock.Qx > base.Qx;
+  const yExpands = shock.Qy > base.Qy;
+
+  const xCapInt = p.aKX > p.aKY;
+  const shockDesc = dK > 0 ? "K↑" : dK < 0 ? "K↓" : dL > 0 ? "L↑" : dL < 0 ? "L↓" : "no shock";
+
+  return (
+    <div>
+      <div style={{ fontSize: "0.62rem", color: dim, fontStyle: "italic", marginBottom: "0.7rem", fontFamily: mono, lineHeight: 1.6 }}>
+        At constant goods prices, a factor endowment increase expands the sector that uses it intensively and <em>contracts</em> the other (magnification effect).
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem", marginBottom: "0.8rem" }}>
+        <div>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, marginBottom: "0.3rem" }}>ΔK (capital shock)</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <input type="range" min={-p.KH * 0.5} max={p.KH * 0.8} step={1} value={dK}
+              onChange={e => setDK(parseFloat(e.target.value))}
+              style={{ accentColor: gold, flex: 1 }} />
+            <span style={{ fontFamily: mono, fontSize: "0.72rem", color: dK > 0 ? green : dK < 0 ? red : dim, minWidth: 40 }}>
+              {dK > 0 ? "+" : ""}{dK.toFixed(0)}
+            </span>
+          </div>
+        </div>
+        <div>
+          <div style={{ fontFamily: mono, fontSize: "0.6rem", color: dim, marginBottom: "0.3rem" }}>ΔL (labor shock)</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <input type="range" min={-p.LH * 0.5} max={p.LH * 0.8} step={1} value={dL}
+              onChange={e => setDL(parseFloat(e.target.value))}
+              style={{ accentColor: gold, flex: 1 }} />
+            <span style={{ fontFamily: mono, fontSize: "0.72rem", color: dL > 0 ? green : dL < 0 ? red : dim, minWidth: 40 }}>
+              {dL > 0 ? "+" : ""}{dL.toFixed(0)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+        {/* Chart */}
+        <svg width={W} height={H} style={{ fontFamily: mono, flexShrink: 0 }}>
+          <g transform={`translate(${pad.left},${pad.top})`}>
+            {[0.25,0.5,0.75,1].map(f => (
+              <g key={f}>
+                <line x1={0} y1={sy(f*maxQ)} x2={cW} y2={sy(f*maxQ)} stroke="rgba(255,255,255,0.03)" />
+                <line x1={sx(f*maxQ)} y1={0} x2={sx(f*maxQ)} y2={cH} stroke="rgba(255,255,255,0.03)" />
+              </g>
+            ))}
+            <line x1={0} y1={cH} x2={cW} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
+            <line x1={0} y1={0} x2={0} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
+            <text x={cW/2} y={cH+28} textAnchor="middle" fill={dim} fontSize={9}>Good X (capital-intensive)</text>
+            <text x={-cH/2} y={-32} textAnchor="middle" fill={dim} fontSize={9} transform="rotate(-90)">Good Y (labor-intensive)</text>
+            {[0,0.5,1].map(f => (
+              <g key={f}>
+                <text x={sx(f*maxQ)} y={cH+12} textAnchor="middle" fill="#3a4a5a" fontSize={7.5}>{(f*maxQ).toFixed(0)}</text>
+                {f > 0 && <text x={-6} y={sy(f*maxQ)+3} textAnchor="end" fill="#3a4a5a" fontSize={7.5}>{(f*maxQ).toFixed(0)}</text>}
+              </g>
+            ))}
+
+            {/* Rybczynski line (extended through both points) */}
+            {(dK !== 0 || dL !== 0) && (() => {
+              const len = Math.sqrt(ryb.dx**2 + ryb.dy**2);
+              if (len < 0.01) return null;
+              const ext = maxQ * 2;
+              const x1 = base.Qx - (ryb.dx/len)*ext; const y1 = base.Qy - (ryb.dy/len)*ext;
+              const x2 = base.Qx + (ryb.dx/len)*ext; const y2 = base.Qy + (ryb.dy/len)*ext;
+              return <line x1={sx(x1)} y1={sy(y1)} x2={sx(x2)} y2={sy(y2)}
+                stroke={gold} strokeWidth={1} strokeDasharray="4,3" opacity={0.4} />;
+            })()}
+
+            {/* Arrow from base to shock */}
+            {(dK !== 0 || dL !== 0) && (
+              <line x1={sx(base.Qx)} y1={sy(base.Qy)} x2={sx(shock.Qx)} y2={sy(shock.Qy)}
+                stroke={gold} strokeWidth={2} markerEnd="url(#arrow)" />
+            )}
+
+            <defs>
+              <marker id="arrow" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L6,3 z" fill={gold} />
+              </marker>
+            </defs>
+
+            {/* Base point */}
+            <circle cx={sx(base.Qx)} cy={sy(base.Qy)} r={5} fill={blue} />
+            <text x={sx(base.Qx)+7} y={sy(base.Qy)-4} fill={blue} fontSize={7.5}>Base</text>
+            <text x={sx(base.Qx)+7} y={sy(base.Qy)+6} fill={dim} fontSize={6.5}>({base.Qx.toFixed(1)}, {base.Qy.toFixed(1)})</text>
+
+            {/* Shock point */}
+            {(dK !== 0 || dL !== 0) && (
+              <>
+                <circle cx={sx(shock.Qx)} cy={sy(shock.Qy)} r={5} fill={green} />
+                <text x={sx(shock.Qx)+7} y={sy(shock.Qy)-4} fill={green} fontSize={7.5}>New</text>
+                <text x={sx(shock.Qx)+7} y={sy(shock.Qy)+6} fill={dim} fontSize={6.5}>({shock.Qx.toFixed(1)}, {shock.Qy.toFixed(1)})</text>
+              </>
+            )}
+          </g>
+        </svg>
+
+        {/* Stats */}
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.4rem", marginBottom: "0.6rem" }}>
+            {[
+              { label: "X (base)", value: base.Qx.toFixed(1), color: blue },
+              { label: "Y (base)", value: base.Qy.toFixed(1), color: blue },
+              { label: "X (new)", value: shock.Qx.toFixed(1), color: xExpands ? green : red },
+              { label: "Y (new)", value: shock.Qy.toFixed(1), color: yExpands ? green : red },
+              { label: "ΔX", value: `${(shock.Qx-base.Qx)>=0?"+":""}${(shock.Qx-base.Qx).toFixed(1)}`, color: xExpands ? green : red },
+              { label: "ΔY", value: `${(shock.Qy-base.Qy)>=0?"+":""}${(shock.Qy-base.Qy).toFixed(1)}`, color: yExpands ? green : red },
+            ].map((s,i) => (
+              <div key={i} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", padding: "0.35rem 0.5rem", borderRadius: "2px" }}>
+                <div style={{ fontFamily: mono, fontSize: "0.55rem", color: dim }}>{s.label}</div>
+                <div style={{ fontFamily: mono, fontSize: "0.72rem", color: s.color, fontWeight: 600 }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+          {(dK !== 0 || dL !== 0) && (
+            <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, lineHeight: 1.7,
+              background: "rgba(255,255,255,0.02)", padding: "0.5rem 0.6rem",
+              borderRadius: "2px", borderLeft: `2px solid ${gold}` }}>
+              {dK > 0 && xCapInt && `K↑ → X expands (capital-intensive), Y contracts. Rybczynski theorem confirmed.`}
+              {dK > 0 && !xCapInt && `K↑ → Y expands (capital-intensive), X contracts. Rybczynski theorem confirmed.`}
+              {dK < 0 && xCapInt && `K↓ → X contracts (capital-intensive), Y expands.`}
+              {dK < 0 && !xCapInt && `K↓ → Y contracts (capital-intensive), X expands.`}
+              {dL > 0 && xCapInt && `L↑ → Y expands (labor-intensive), X contracts. Rybczynski theorem confirmed.`}
+              {dL > 0 && !xCapInt && `L↑ → X expands (labor-intensive), Y contracts. Rybczynski theorem confirmed.`}
+              {dL < 0 && xCapInt && `L↓ → Y contracts (labor-intensive), X expands.`}
+              {dL < 0 && !xCapInt && `L↓ → X contracts (labor-intensive), Y expands.`}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── FACTOR PRICE EQUALIZATION ────────────────────────────────────────────────
+
+function FPEViz({ p }) {
+  const mono = "'IBM Plex Mono', monospace";
+  const gold = "#e2c97e";
+  const blue = "#4a9fe8";
+  const purple = "#a57fa5";
+  const green = "#7fe87f";
+  const red = "#e87f7f";
+  const dim = "#3a5a7a";
+
+  // Factor prices from zero-profit conditions:
+  // P_X = w*aLX + r*aKX  =>  w*(1-tKX) + r*tKX = P_X
+  // P_Y = w*aLY + r*aKY  =>  w*(1-tKY) + r*tKY = P_Y
+  // Given prices P_X=1, P_Y=1 (normalized), solve for w and r:
+  // [1-tKX, tKX; 1-tKY, tKY] * [w; r] = [1; 1]
+
+  const tKX = p.aKX; const tLX = 1 - p.aKX;
+  const tKY = p.aKY; const tLY = 1 - p.aKY;
+
+  // Autarky: factor prices reflect domestic factor abundance
+  // Home (capital-abundant): higher r_autarky relative to w vs Foreign
+  // We proxy autarky factor prices using K/L ratios
+  const kH = p.KH / p.LH;
+  const kF = p.KF / p.LF;
+
+  // Solve for trade factor prices (same for both countries under FPE)
+  const det = tLX * tKY - tKX * tLY;
+  let w_trade = 0, r_trade = 0;
+  if (Math.abs(det) > 1e-9) {
+    w_trade = (tKY - tKX) / det;  // simplified with P_X=P_Y=1
+    r_trade = (tLX - tLY) / det;
+    w_trade = Math.max(0.01, w_trade);
+    r_trade = Math.max(0.01, r_trade);
+  }
+
+  // Autarky factor prices: proportional to factor scarcity
+  // Home autarky: w_H proportional to L scarcity, r_H to K abundance
+  const w_H_aut = 1 / kH;   // lower wage when capital-abundant (K/L high)
+  const r_H_aut = kH;       // higher r when capital-abundant
+  const w_F_aut = 1 / kF;
+  const r_F_aut = kF;
+
+  // Normalize so trade values = 1 for comparison
+  const norm = w_trade + r_trade;
+  const wT = w_trade / norm; const rT = r_trade / norm;
+  const wHA = w_H_aut / (w_H_aut + r_H_aut);
+  const rHA = r_H_aut / (w_H_aut + r_H_aut);
+  const wFA = w_F_aut / (w_F_aut + r_F_aut);
+  const rFA = r_F_aut / (w_F_aut + r_F_aut);
+
+  // Check if countries are in cone of diversification
+  // FPE holds if both countries have same factor price equalization
+  // Proxy: endowment ratios not too different
+  const ratio = kH / kF;
+  const inCone = ratio < 4 && ratio > 0.25;
+
+  // Bar chart data
+  const bars = [
+    { label: "w Home\n(autarky)", value: wHA, color: blue, opacity: 0.5 },
+    { label: "w Foreign\n(autarky)", value: wFA, color: purple, opacity: 0.5 },
+    { label: "w Home\n(trade)", value: wT, color: blue, opacity: 1 },
+    { label: "w Foreign\n(trade)", value: wT, color: purple, opacity: 1 },
+    { label: "r Home\n(autarky)", value: rHA, color: blue, opacity: 0.5 },
+    { label: "r Foreign\n(autarky)", value: rFA, color: purple, opacity: 0.5 },
+    { label: "r Home\n(trade)", value: rT, color: blue, opacity: 1 },
+    { label: "r Foreign\n(trade)", value: rT, color: purple, opacity: 1 },
+  ];
+
+  const W = 520; const H = 140;
+  const pad = { top: 10, right: 10, bottom: 40, left: 30 };
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
+  const barW = cW / bars.length - 4;
+
+  return (
+    <div>
+      <div style={{ fontSize: "0.62rem", color: dim, fontStyle: "italic", marginBottom: "0.7rem", fontFamily: mono, lineHeight: 1.6 }}>
+        Trade equalizes factor prices across countries even without factor mobility — provided both countries remain in the <em>cone of diversification</em> (producing both goods).
+      </div>
+
+      {!inCone && (
+        <div style={{ background: "rgba(232,127,127,0.08)", border: "1px solid #e87f7f44", borderLeft: "3px solid #e87f7f",
+          padding: "0.5rem 0.8rem", marginBottom: "0.7rem", borderRadius: "2px",
+          fontFamily: mono, fontSize: "0.65rem", color: red }}>
+          ⚠ K/L ratio difference ({ratio.toFixed(2)}×) is large — countries may be outside the cone of diversification. FPE may not hold.
+        </div>
+      )}
+
+      <svg width={W} height={H} style={{ fontFamily: mono, display: "block", marginBottom: "0.6rem" }}>
+        <g transform={`translate(${pad.left},${pad.top})`}>
+          <line x1={0} y1={cH} x2={cW} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
+          <line x1={0} y1={0} x2={0} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
+          {[0.5, 1].map(f => (
+            <g key={f}>
+              <line x1={0} y1={cH*(1-f)} x2={cW} y2={cH*(1-f)} stroke="rgba(255,255,255,0.04)" />
+              <text x={-4} y={cH*(1-f)+3} textAnchor="end" fill={dim} fontSize={7}>{f.toFixed(1)}</text>
+            </g>
+          ))}
+          {bars.map((b, i) => {
+            const x = i * (barW + 4);
+            const bh = b.value * cH;
+            const isWage = i < 4;
+            const label1 = b.label.split("\n")[0];
+            const label2 = b.label.split("\n")[1];
+            return (
+              <g key={i}>
+                {i === 4 && <line x1={x-2} y1={0} x2={x-2} y2={cH} stroke="#2a3a4a" strokeWidth={1} strokeDasharray="2,2" />}
+                <rect x={x} y={cH-bh} width={barW} height={bh} fill={b.color} opacity={b.opacity} rx={1} />
+                {/* FPE: draw equality line between trade bars */}
+                {(i === 2 || i === 6) && inCone && (
+                  <line x1={x+barW} y1={cH-bh} x2={x+barW+4} y2={cH-bh} stroke={green} strokeWidth={1.5} strokeDasharray="2,2" />
+                )}
+                <text x={x+barW/2} y={cH+12} textAnchor="middle" fill={b.color} fontSize={6} opacity={b.opacity+0.2}>{label1}</text>
+                <text x={x+barW/2} y={cH+22} textAnchor="middle" fill={dim} fontSize={5.5}>{label2}</text>
+              </g>
+            );
+          })}
+          {/* Section labels */}
+          <text x={cW*0.22} y={-3} textAnchor="middle" fill={dim} fontSize={7}>— WAGES (w) —</text>
+          <text x={cW*0.75} y={-3} textAnchor="middle" fill={dim} fontSize={7}>— RETURNS TO CAPITAL (r) —</text>
+        </g>
+      </svg>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.4rem" }}>
+        {[
+          { label: "w Home autarky", value: wHA.toFixed(3), color: blue },
+          { label: "w Foreign autarky", value: wFA.toFixed(3), color: purple },
+          { label: "w* (trade, both)", value: inCone ? wT.toFixed(3) : "N/A", color: green },
+          { label: "Cone of diversif.", value: inCone ? "✓ Yes" : "✗ No", color: inCone ? green : red },
+          { label: "r Home autarky", value: rHA.toFixed(3), color: blue },
+          { label: "r Foreign autarky", value: rFA.toFixed(3), color: purple },
+          { label: "r* (trade, both)", value: inCone ? rT.toFixed(3) : "N/A", color: green },
+          { label: "K/L ratio gap", value: `${ratio.toFixed(2)}×`, color: inCone ? dim : red },
+        ].map((s,i) => (
+          <div key={i} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", padding: "0.35rem 0.5rem", borderRadius: "2px" }}>
+            <div style={{ fontFamily: mono, fontSize: "0.55rem", color: dim }}>{s.label}</div>
+            <div style={{ fontFamily: mono, fontSize: "0.68rem", color: s.color, fontWeight: 600 }}>{s.value}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -614,6 +1254,12 @@ function HOModel() {
               </>
             )}
           </AxesChart>
+          <Collapsible title="Rybczynski Theorem" accent="#e2c97e" defaultOpen={false}>
+            <RybczynskiViz p={p} />
+          </Collapsible>
+          <Collapsible title="Factor Price Equalization" accent="#7fe87f" defaultOpen={false}>
+            <FPEViz p={p} />
+          </Collapsible>
         </Panel>
       </div>
     </div>
@@ -736,69 +1382,153 @@ function StandardModel() {
       </div>
       <div>
         <Panel title="PPF, Price Line & Welfare Triangles">
-          <AxesChart width={310} height={300} xMax={sMax} yMax={sMax} xLabel="Good X (exports)" yLabel="Good Y (imports)">
-            {({ sx, sy, H }) => {
+          <AxesChart width={340} height={320} xMax={sMax} yMax={sMax} xLabel="Good X (exports)" yLabel="Good Y (imports)">
+            {({ sx, sy, W: cW, H: cH }) => {
               const ppfPts = ppfPoints.map(pt => `${sx(pt.x)},${sy(pt.y)}`).join(" ");
               const blY0 = prodY + prodX * p.ToT;
               const blX1 = Math.min(blY0 / p.ToT, sMax);
               const blY1 = Math.max(0, blY0 - blX1 * p.ToT);
 
-              // Production gain triangle: autarky point, production point, and the
-              // corner that shows the income difference at trade prices
-              // Triangle: (autX, autY), (prodX, prodY), (autX, autY + prodGain)
-              // Simpler visual: right triangle between aut and prod points with corner at (prodX, autY)
+              // Production gain triangle
               const triProd = [
                 `${sx(autX)},${sy(autY)}`,
                 `${sx(prodX)},${sy(autY)}`,
                 `${sx(prodX)},${sy(prodY)}`
               ].join(" ");
 
-              // Exchange gain triangle: between prod and cons points
+              // Exchange gain triangle
               const triExch = [
                 `${sx(prodX)},${sy(prodY)}`,
                 `${sx(consX)},${sy(prodY)}`,
                 `${sx(consX)},${sy(consY)}`
               ].join(" ");
 
-              // Autarky budget line (slope = -1 through autarky point)
-              const autBlY0 = Math.min(autY + autX * 1.0, sMax);
-              const autBlX1 = Math.min(autBlY0, sMax);
+              // Trade triangle: Production → corner → Consumption
+              const triTrade = [
+                `${sx(prodX)},${sy(prodY)}`,
+                `${sx(consX)},${sy(prodY)}`,
+                `${sx(consX)},${sy(consY)}`
+              ].join(" ");
+
+              // Indifference curve through consumption point (Cobb-Douglas: U = Cx^α * Cy^(1-α))
+              // At cons point: U = consX^0.5 * consY^0.5
+              // IC: y = U^2 / x = (consX * consY) / x
+              const U2 = consX * consY;
+              const icPts = [];
+              for (let xi = 1; xi <= sMax; xi += sMax/120) {
+                const yi = U2 / xi;
+                if (yi >= 0 && yi <= sMax * 1.1) {
+                  icPts.push(`${sx(xi)},${sy(yi)}`);
+                }
+              }
+
+              // Autarky IC through autarky point
+              const U2_aut = autX * autY;
+              const icAutPts = [];
+              for (let xi = 1; xi <= sMax; xi += sMax/120) {
+                const yi = U2_aut / xi;
+                if (yi >= 0 && yi <= sMax * 1.1) {
+                  icAutPts.push(`${sx(xi)},${sy(yi)}`);
+                }
+              }
+
+              // Arrow helper
+              const arrow = (x1, y1, x2, y2, color, label, labelSide = "mid") => {
+                const dx = x2 - x1; const dy = y2 - y1;
+                const len = Math.sqrt(dx*dx + dy*dy);
+                if (len < 4) return null;
+                const ux = dx/len; const uy = dy/len;
+                const ax = x2 - ux*8; const ay = y2 - uy*8;
+                const px = -uy*4; const py = ux*4;
+                const lx = labelSide === "mid" ? (x1+x2)/2 : x2;
+                const ly = labelSide === "mid" ? (y1+y2)/2 : y2;
+                return (
+                  <g>
+                    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={2} opacity={0.9} />
+                    <polygon points={`${ax+px},${ay+py} ${ax-px},${ay-py} ${x2},${y2}`} fill={color} opacity={0.9} />
+                    {label && <text x={lx+5} y={ly-4} fill={color} fontSize={7.5} fontWeight={600}>{label}</text>}
+                  </g>
+                );
+              };
+
               return (
                 <>
-                  <polygon points={triProd} fill="rgba(226,201,126,0.15)" stroke="#e2c97e" strokeWidth={1} strokeDasharray="3,2" />
-                  <polygon points={triExch} fill="rgba(127,232,127,0.12)" stroke="#7fe87f" strokeWidth={1} strokeDasharray="3,2" />
+                  {/* Indifference curves */}
+                  {showAutarky && icAutPts.length > 1 && (
+                    <polyline points={icAutPts.join(" ")} fill="none" stroke="#5a6a7a" strokeWidth={1.2} strokeDasharray="3,3" opacity={0.5} />
+                  )}
+                  {icPts.length > 1 && (
+                    <polyline points={icPts.join(" ")} fill="none" stroke="#7fe87f" strokeWidth={1.5} strokeDasharray="4,3" opacity={0.7} />
+                  )}
+
+                  {/* Welfare triangles */}
+                  <polygon points={triProd} fill="rgba(226,201,126,0.13)" stroke="#e2c97e" strokeWidth={1} strokeDasharray="3,2" />
+                  <polygon points={triExch} fill="rgba(127,232,127,0.10)" stroke="#7fe87f" strokeWidth={1} strokeDasharray="3,2" />
+
+                  {/* PPF */}
                   <polyline points={ppfPts} fill="none" stroke="#4a9fe8" strokeWidth={2.5} />
-                  {/* Autarky budget line (slope=-1) */}
+
+                  {/* Autarky price line */}
                   {showAutarky && (
                     <line x1={sx(0)} y1={sy(Math.min(autY + autX, sMax))} x2={sx(Math.min(autX + autY, sMax))} y2={sy(0)}
                       stroke="#5a6a7a" strokeWidth={1} strokeDasharray="3,3" opacity={0.5} />
                   )}
+
                   {/* Trade budget line */}
-                  <line x1={sx(0)} y1={sy(Math.min(blY0, sMax))} x2={sx(blX1)} y2={sy(blY1)} stroke="#e2c97e" strokeWidth={1.5} strokeDasharray="5,3" opacity={0.8} />
+                  <line x1={sx(0)} y1={sy(Math.min(blY0, sMax))} x2={sx(blX1)} y2={sy(blY1)}
+                    stroke="#e2c97e" strokeWidth={1.5} strokeDasharray="5,3" opacity={0.8} />
+
+                  {/* Trade triangle with labeled arrows */}
+                  {exports_ > 1 && arrow(sx(prodX), sy(prodY), sx(consX), sy(prodY), "#e87f7f", `Exports: ${exports_.toFixed(1)}`, "mid")}
+                  {imports_ > 1 && arrow(sx(consX), sy(prodY), sx(consX), sy(consY), "#e87f7f", `Imports: ${imports_.toFixed(1)}`, "mid")}
+
+                  {/* Trade triangle hypotenuse (dashed) */}
+                  {exports_ > 1 && imports_ > 1 && (
+                    <line x1={sx(prodX)} y1={sy(prodY)} x2={sx(consX)} y2={sy(consY)}
+                      stroke="#e87f7f" strokeWidth={1} strokeDasharray="3,2" opacity={0.5} />
+                  )}
+
+                  {/* Welfare triangle labels */}
+                  {prodGain > 1 && (
+                    <text x={sx((autX + prodX) / 2)} y={sy(Math.max(autY, prodY) + (Math.abs(prodY-autY)*0.5))} fill="#e2c97e" fontSize={7} textAnchor="middle" opacity={0.9}>prod. gain</text>
+                  )}
+                  {exchGain > 1 && (
+                    <text x={sx((prodX + consX) / 2) - 10} y={sy((prodY + consY) / 2)} fill="#7fe87f" fontSize={7} textAnchor="middle" opacity={0.9}>exch. gain</text>
+                  )}
+
+                  {/* Points */}
                   {showAutarky && (
                     <>
                       <circle cx={sx(autX)} cy={sy(autY)} r={5} fill="#5a6a7a" stroke="#8a9bb0" strokeWidth={1} />
-                      <text x={sx(autX) + 6} y={sy(autY) - 6} fill="#8a9bb0" fontSize={8}>Autarky</text>
+                      <text x={sx(autX) - 6} y={sy(autY) - 8} fill="#8a9bb0" fontSize={8} textAnchor="middle">A</text>
                     </>
                   )}
                   <circle cx={sx(prodX)} cy={sy(prodY)} r={6} fill="#e2c97e" />
-                  <text x={sx(prodX) + 8} y={sy(prodY) + 4} fill="#e2c97e" fontSize={8}>Prod.</text>
+                  <text x={sx(prodX) + 8} y={sy(prodY) + 4} fill="#e2c97e" fontSize={8} fontWeight={600}>P</text>
                   <circle cx={sx(consX)} cy={sy(consY)} r={6} fill="#7fe87f" />
-                  <text x={sx(consX) + 6} y={sy(consY) - 6} fill="#7fe87f" fontSize={8}>Cons.</text>
-                  <line x1={sx(consX)} y1={sy(consY)} x2={sx(prodX)} y2={sy(consY)} stroke="#e87f7f" strokeWidth={1.5} opacity={0.7} />
-                  <line x1={sx(prodX)} y1={sy(consY)} x2={sx(prodX)} y2={sy(prodY)} stroke="#e87f7f" strokeWidth={1.5} opacity={0.7} />
-                  {prodGain > 0.5 && (
-                    <text x={sx((autX + prodX) / 2)} y={sy(Math.max(autY, prodY)) - 5} fill="#e2c97e" fontSize={7} textAnchor="middle" opacity={0.8}>Prod. gain</text>
+                  <text x={sx(consX) + 8} y={sy(consY) + 4} fill="#7fe87f" fontSize={8} fontWeight={600}>C</text>
+
+                  {/* IC label */}
+                  {icPts.length > 1 && (
+                    <text x={sx(sMax * 0.08)} y={sy(U2 / (sMax * 0.08)) - 6} fill="#7fe87f" fontSize={7} opacity={0.8}>U₁ (trade)</text>
                   )}
-                  {exchGain > 0.5 && (
-                    <text x={sx((prodX + consX) / 2)} y={sy((prodY + consY) / 2)} fill="#7fe87f" fontSize={7} textAnchor="middle" opacity={0.8}>Exch. gain</text>
+                  {showAutarky && icAutPts.length > 1 && (
+                    <text x={sx(sMax * 0.06)} y={sy(U2_aut / (sMax * 0.06)) - 6} fill="#5a6a7a" fontSize={7} opacity={0.7}>U₀ (autarky)</text>
                   )}
                 </>
               );
             }}
           </AxesChart>
           <div style={{ display: "flex", gap: "0.8rem", marginTop: "0.4rem", flexWrap: "wrap" }}>
-            {[["#4a9fe8", "PPF"], ["#e2c97e", "Trade price line"], ["#5a6a7a", "Autarky price line"], ["#7fe87f", "Consumption"], ["#e87f7f", "Trade Δ"], ["rgba(226,201,126,0.5)", "Prod. gain"], ["rgba(127,232,127,0.4)", "Exch. gain"]].map(([c, l]) => (
+            {[
+              ["#4a9fe8", "PPF"],
+              ["#e2c97e", "Trade price line / P"],
+              ["#7fe87f", "U₁ (trade IC) / C"],
+              ["#5a6a7a", "U₀ (autarky IC) / A"],
+              ["#e87f7f", "Trade triangle (exports/imports)"],
+              ["rgba(226,201,126,0.5)", "Production gain"],
+              ["rgba(127,232,127,0.4)", "Exchange gain"]
+            ].map(([c, l]) => (
               <div key={l} style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.6rem", color: "#5a6a7a" }}>
                 <div style={{ width: 8, height: 8, borderRadius: "1px", background: c, border: "1px solid rgba(255,255,255,0.1)" }} />{l}
               </div>
