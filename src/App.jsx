@@ -59,10 +59,18 @@ function Explainer({ children }) {
 }
 
 function PresetDropdown({ presets, onSelect }) {
+  const [selected, setSelected] = useState("");
   return (
     <div style={{ marginBottom: "1rem" }}>
       <div style={{ fontSize: "0.62rem", color: "#5a6a7a", fontFamily: "'IBM Plex Mono', monospace", letterSpacing: "0.06em", marginBottom: "0.4rem" }}>LOAD REAL-WORLD PRESET</div>
-      <select onChange={e => { if (e.target.value) onSelect(e.target.value); e.target.value = ""; }}
+      <select
+        value={selected}
+        onChange={e => {
+          if (e.target.value) {
+            setSelected(e.target.value);
+            onSelect(e.target.value);
+          }
+        }}
         style={{ background: "#0d1520", border: "1px solid rgba(255,255,255,0.1)", color: "#c8d8e8", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem", padding: "0.4rem 0.6rem", borderRadius: "2px", width: "100%", cursor: "pointer" }}>
         <option value="">— select preset —</option>
         {presets.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
