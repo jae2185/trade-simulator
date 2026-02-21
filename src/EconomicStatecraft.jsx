@@ -4,6 +4,14 @@ import { useState, useEffect } from "react";
 
 const TOTAL_TURNS = 8;
 
+// Export supply elasticities per country (for optimal tariff calc t* = 1/(ε-1))
+const ELASTICITIES = {
+  usa:  2.5, // large, diversified — moderate elasticity
+  china:1.8, // highly competitive exports — low elasticity (market power)
+  eu:   2.2,
+  em:   3.5, // small economy — high elasticity
+};
+
 const COUNTRIES = {
   home: { name: "Cascadia", flag: "🏔", color: "#e2c97e", desc: "A mid-sized open economy rich in natural resources and skilled labor." },
   usa:  { name: "Americana", flag: "🦅", color: "#4a9fe8", desc: "The dominant global power. Large capital-abundant economy." },
@@ -19,7 +27,9 @@ const INITIAL_STATE = {
   log: [],
   shock: null,
   selectedActions: [],
-  history: [], // snapshots: { turn, welfare, ToT, varieties, kl, exportShare }
+  history: [],
+  crises: [], // pending AI-initiated events requiring player response
+  ftaPartners: [], // countries with active FTAs
 
   // Home country parameters (Ricardian + H-O + Standard)
   home: {
@@ -65,6 +75,7 @@ const POLICY_ACTIONS = [
       s.home.varieties = Math.round(s.home.varieties * 1.15);
       s.home.welfare = Math.round(s.home.welfare * 1.04);
       s.home.ToT = Math.min(3, s.home.ToT * 1.05);
+      s.ftaPartners = [...(s.ftaPartners || []), target];
       s.log.push({ turn: state.turn, type: "policy", text: `✅ FTA signed with ${COUNTRIES[target].name}. Trade volume +30%, 4% welfare gain, relations improved.` });
       // AI reacts positively
       s.countries[target].relations_to_home = Math.min(100, s.countries[target].relations_to_home + 15);
@@ -267,13 +278,82 @@ function rollShock() {
 
 function applyAITurns(state) {
   const s = deepClone(state);
-  // Simple AI: each country grows slightly, adjusts relations based on home actions
+  const newCrises = [];
+
   Object.keys(s.countries).forEach(c => {
+    // AI growth
     s.countries[c].gdp = Math.round(s.countries[c].gdp * (1 + Math.random() * 0.03));
     s.countries[c].welfare = Math.round(s.countries[c].welfare * (1 + (Math.random() - 0.3) * 0.02));
-    // Drift relations slightly toward neutral
-    s.relations[c] = Math.round(s.relations[c] * 0.95);
+    s.relations[c] = Math.round(s.relations[c] * 0.95); // drift toward neutral
+
+    const rel = s.relations[c];
+
+    // ── AI TARIFF: if relations < -10, 35% chance they tariff you ──
+    if (rel < -10 && Math.random() < 0.35) {
+      const eps = ELASTICITIES[c];
+      const optTariff = 1 / (eps - 1);
+      newCrises.push({
+        id: `tariff_${c}_${s.turn}`,
+        type: "ai_tariff",
+        country: c,
+        epsilon: eps,
+        optimalTariff: optTariff,
+        text: `${COUNTRIES[c].flag} ${COUNTRIES[c].name} has imposed a tariff on Cascadian exports. Their export supply elasticity ε=${eps.toFixed(1)}. Your optimal retaliation rate t*=1/(ε-1)=${(optTariff*100).toFixed(0)}%.`,
+        resolved: false,
+      });
+      s.home.welfare = Math.round(s.home.welfare * 0.97);
+      s.home.ToT = Math.max(0.2, s.home.ToT * 0.95);
+      s.log.push({ turn: s.turn, type: "event", text: `⚠️ ${COUNTRIES[c].name} imposed tariffs on Cascadia. Welfare -3%, ToT deteriorated.` });
+    }
+
+    // ── CURRENCY WAR: if no FTA and country depreciates, 25% chance ──
+    if (!s.ftaPartners?.includes(c) && Math.random() < 0.25 && rel < 30) {
+      s.countries[c].ToT = Math.min(3, s.countries[c].ToT * 1.1);
+      s.home.ToT = Math.max(0.2, s.home.ToT * 0.94);
+      s.home.welfare = Math.round(s.home.welfare * 0.98);
+      newCrises.push({
+        id: `currwar_${c}_${s.turn}`,
+        type: "currency_war",
+        country: c,
+        text: `${COUNTRIES[c].flag} ${COUNTRIES[c].name} has depreciated their currency, gaining export competitiveness at your expense. Your ToT fell. Counter-depreciate or absorb the loss?`,
+        resolved: false,
+      });
+      s.log.push({ turn: s.turn, type: "event", text: `💱 ${COUNTRIES[c].name} currency depreciation hurt Cascadian ToT. Welfare -2%.` });
+    }
+
+    // ── FTA POACHING: rival signs FTA with one of your allies ──
+    if (Math.random() < 0.18 && rel < 20) {
+      const allies = Object.keys(s.relations).filter(x => x !== c && s.relations[x] > 40);
+      if (allies.length > 0) {
+        const ally = allies[Math.floor(Math.random() * allies.length)];
+        const tradeLost = Math.round(s.trade[ally] * 0.15);
+        s.trade[ally] = Math.max(0, s.trade[ally] - tradeLost);
+        s.home.welfare = Math.round(s.home.welfare * 0.985);
+        s.log.push({ turn: s.turn, type: "event", text: `📉 Trade diversion: ${COUNTRIES[c].name} signed an FTA with ${COUNTRIES[ally].name}. Your trade with ${COUNTRIES[ally].name} diverted by ${tradeLost} units (Viner trade diversion). Welfare -1.5%.` });
+      }
+    }
   });
+
+  // ── SANCTIONS COALITION: if you sanctioned someone and their ally is angry ──
+  const sanctioned = Object.keys(s.trade).filter(c => s.trade[c] === 0);
+  if (sanctioned.length > 0) {
+    Object.keys(s.relations).forEach(c => {
+      if (!sanctioned.includes(c) && s.countries[c].relations_to_home < -20 && Math.random() < 0.4) {
+        s.home.welfare = Math.round(s.home.welfare * 0.96);
+        s.home.gdp = Math.round(s.home.gdp * 0.97);
+        s.log.push({ turn: s.turn, type: "event", text: `🔗 Sanctions coalition: ${COUNTRIES[c].name} joined sanctions against Cascadia in solidarity with ${sanctioned.map(x => COUNTRIES[x].name).join(", ")}. GDP -3%, welfare -4%.` });
+        newCrises.push({
+          id: `coalition_${c}_${s.turn}`,
+          type: "sanctions_coalition",
+          country: c,
+          text: `${COUNTRIES[c].flag} ${COUNTRIES[c].name} has joined a sanctions coalition against Cascadia. Offer diplomacy to break the coalition, or retaliate?`,
+          resolved: false,
+        });
+      }
+    });
+  }
+
+  s.crises = [...(s.crises || []).filter(cr => cr.resolved), ...newCrises];
   return s;
 }
 
@@ -554,6 +634,208 @@ function EconomicDashboard({ state }) {
       )}
     </div>
   );
+}
+
+
+// ─── CRISIS RESPONSE SCREEN ───────────────────────────────────────────────────
+
+function CrisisScreen({ crisis, state, onRespond }) {
+  const country = COUNTRIES[crisis.country];
+
+  if (crisis.type === "ai_tariff") {
+    const eps = crisis.epsilon;
+    const tOpt = crisis.optimalTariff;
+    const tAgg = tOpt * 1.4;
+    const options = [
+      {
+        id: "absorb",
+        label: "Absorb the loss",
+        icon: "🕊",
+        desc: `Accept the welfare hit. Relations with ${country.name} stabilize. No escalation.`,
+        welfareEffect: -1,
+        relationEffect: +10,
+        color: "#7fe87f",
+      },
+      {
+        id: "optimal",
+        label: `Retaliate at t*=${( tOpt*100).toFixed(0)}%`,
+        icon: "⚖",
+        desc: `Optimal tariff: maximizes your terms-of-trade gain given ε=${eps.toFixed(1)}. ${country.name} may escalate further.`,
+        welfareEffect: +2,
+        relationEffect: -15,
+        color: C.gold,
+      },
+      {
+        id: "aggressive",
+        label: `Aggressive retaliation at ${(tAgg*100).toFixed(0)}%`,
+        icon: "⚔",
+        desc: `Above t* — signals resolve but risks welfare loss if they counter-retaliate. Trade war likely.`,
+        welfareEffect: -3,
+        relationEffect: -30,
+        color: "#e87f7f",
+      },
+    ];
+
+    return (
+      <div style={{ padding: "2rem", maxWidth: 680, margin: "0 auto" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.16em", color: "#e87f7f", marginBottom: "0.5rem" }}>⚡ CRISIS — TARIFF IMPOSED</div>
+        <div style={{ fontSize: "1.2rem", color: C.gold, fontFamily: mono, fontWeight: 300, marginBottom: "1rem" }}>Respond to {country.name}</div>
+
+        <Card title="Situation" accent="#e87f7f" style={{ marginBottom: "1rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.78rem", color: "#c8b8b8", lineHeight: 1.8 }}>{crisis.text}</div>
+        </Card>
+
+        <Card title="Optimal Tariff Theory" accent={C.blue} style={{ marginBottom: "1.2rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.72rem", color: "#8a9bb0", lineHeight: 1.8 }}>
+            <span style={{ color: C.gold }}>t* = 1/(ε − 1) = 1/({eps.toFixed(1)} − 1) = {(tOpt*100).toFixed(0)}%</span>
+            <br />
+            At t*, you maximize the terms-of-trade gain from restricting their exports. Above t*, you over-restrict and your own consumers lose more than you gain. Below t*, you leave welfare on the table. The Nash tariff equilibrium (mutual retaliation) leaves both countries worse off than free trade.
+          </div>
+        </Card>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+          {options.map(opt => (
+            <button key={opt.id} onClick={() => onRespond(crisis, opt.id, opt)} style={{
+              background: "rgba(255,255,255,0.02)", border: `1px solid ${opt.color}`,
+              borderLeft: `4px solid ${opt.color}`, color: C.text,
+              fontFamily: mono, padding: "0.9rem 1.2rem", cursor: "pointer",
+              textAlign: "left", borderRadius: "2px", transition: "all 0.15s",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
+                <span style={{ fontSize: "0.82rem", color: opt.color }}>{opt.icon} {opt.label}</span>
+                <span style={{ fontSize: "0.65rem", color: opt.welfareEffect >= 0 ? "#7fe87f" : "#e87f7f" }}>
+                  Welfare {opt.welfareEffect >= 0 ? "+" : ""}{opt.welfareEffect}% | Relations {opt.relationEffect >= 0 ? "+" : ""}{opt.relationEffect}
+                </span>
+              </div>
+              <div style={{ fontSize: "0.68rem", color: "#5a7a9a" }}>{opt.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (crisis.type === "currency_war") {
+    const options = [
+      {
+        id: "absorb",
+        label: "Absorb the ToT loss",
+        icon: "🕊",
+        desc: "Accept the competitive disadvantage this turn. Signals restraint — may reduce further currency aggression.",
+        welfareEffect: 0,
+        relationEffect: +5,
+        color: "#7fe87f",
+      },
+      {
+        id: "counter_depreciate",
+        label: "Counter-depreciate",
+        icon: "💱",
+        desc: "Match their depreciation. Restores your ToT but damages all bilateral relations and risks inflationary pressure.",
+        welfareEffect: +1,
+        relationEffect: -10,
+        color: C.gold,
+      },
+      {
+        id: "fta_offer",
+        label: "Offer an FTA to stabilize",
+        icon: "🤝",
+        desc: "Propose a Free Trade Agreement — locks in stable exchange terms, removes currency war incentive. Requires good-faith acceptance.",
+        welfareEffect: +3,
+        relationEffect: +20,
+        color: C.blue,
+      },
+    ];
+
+    return (
+      <div style={{ padding: "2rem", maxWidth: 680, margin: "0 auto" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.16em", color: "#e2c97e", marginBottom: "0.5rem" }}>⚡ CRISIS — CURRENCY WAR</div>
+        <div style={{ fontSize: "1.2rem", color: C.gold, fontFamily: mono, fontWeight: 300, marginBottom: "1rem" }}>Currency aggression from {country.name}</div>
+        <Card title="Situation" accent="#e2c97e" style={{ marginBottom: "1.2rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.78rem", color: "#c8c8b8", lineHeight: 1.8 }}>{crisis.text}</div>
+        </Card>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+          {options.map(opt => (
+            <button key={opt.id} onClick={() => onRespond(crisis, opt.id, opt)} style={{
+              background: "rgba(255,255,255,0.02)", border: `1px solid ${opt.color}`,
+              borderLeft: `4px solid ${opt.color}`, color: C.text,
+              fontFamily: mono, padding: "0.9rem 1.2rem", cursor: "pointer",
+              textAlign: "left", borderRadius: "2px",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem" }}>
+                <span style={{ fontSize: "0.82rem", color: opt.color }}>{opt.icon} {opt.label}</span>
+                <span style={{ fontSize: "0.65rem", color: opt.welfareEffect >= 0 ? "#7fe87f" : "#e87f7f" }}>
+                  Welfare {opt.welfareEffect >= 0 ? "+" : ""}{opt.welfareEffect}% | Relations {opt.relationEffect >= 0 ? "+" : ""}{opt.relationEffect}
+                </span>
+              </div>
+              <div style={{ fontSize: "0.68rem", color: "#5a7a9a" }}>{opt.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (crisis.type === "sanctions_coalition") {
+    const options = [
+      {
+        id: "diplomacy",
+        label: "Offer diplomatic concessions",
+        icon: "🕊",
+        desc: "Negotiate with the coalition. Costly in credibility but breaks the coalition and restores some trade.",
+        welfareEffect: +2,
+        relationEffect: +25,
+        color: "#7fe87f",
+      },
+      {
+        id: "retaliate",
+        label: "Counter-sanction the coalition",
+        icon: "🔒",
+        desc: "Escalate — sanction all coalition members. Signals resolve but deepens the trade war.",
+        welfareEffect: -4,
+        relationEffect: -40,
+        color: "#e87f7f",
+      },
+      {
+        id: "third_party",
+        label: "Appeal to a neutral third party",
+        icon: "⚖",
+        desc: "Engage Meridian or another neutral to mediate. Slower but preserves all relationships.",
+        welfareEffect: +1,
+        relationEffect: +10,
+        color: C.blue,
+      },
+    ];
+
+    return (
+      <div style={{ padding: "2rem", maxWidth: 680, margin: "0 auto" }}>
+        <div style={{ fontFamily: mono, fontSize: "0.6rem", letterSpacing: "0.16em", color: "#e87f7f", marginBottom: "0.5rem" }}>⚡ CRISIS — SANCTIONS COALITION</div>
+        <div style={{ fontSize: "1.2rem", color: C.gold, fontFamily: mono, fontWeight: 300, marginBottom: "1rem" }}>Coalition forming against Cascadia</div>
+        <Card title="Situation" accent="#e87f7f" style={{ marginBottom: "1.2rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.78rem", color: "#c8b8b8", lineHeight: 1.8 }}>{crisis.text}</div>
+        </Card>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+          {options.map(opt => (
+            <button key={opt.id} onClick={() => onRespond(crisis, opt.id, opt)} style={{
+              background: "rgba(255,255,255,0.02)", border: `1px solid ${opt.color}`,
+              borderLeft: `4px solid ${opt.color}`, color: C.text,
+              fontFamily: mono, padding: "0.9rem 1.2rem", cursor: "pointer",
+              textAlign: "left", borderRadius: "2px",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem" }}>
+                <span style={{ fontSize: "0.82rem", color: opt.color }}>{opt.icon} {opt.label}</span>
+                <span style={{ fontSize: "0.65rem", color: opt.welfareEffect >= 0 ? "#7fe87f" : "#e87f7f" }}>
+                  Welfare {opt.welfareEffect >= 0 ? "+" : ""}{opt.welfareEffect}% | Relations {opt.relationEffect >= 0 ? "+" : ""}{opt.relationEffect}
+                </span>
+              </div>
+              <div style={{ fontSize: "0.68rem", color: "#5a7a9a" }}>{opt.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function BriefingScreen({ state, onContinue }) {
@@ -897,7 +1179,46 @@ export default function EconomicStatecraft() {
     );
   }
 
-  // Game screen — alternates between briefing and action
+  const handleCrisisResponse = (crisis, responseId, option) => {
+    let s = deepClone(state);
+    // Apply welfare and relation effects
+    s.home.welfare = Math.round(s.home.welfare * (1 + option.welfareEffect / 100));
+    s.relations[crisis.country] = Math.max(-100, Math.min(100, s.relations[crisis.country] + option.relationEffect));
+
+    // Special effects per response
+    if (crisis.type === "ai_tariff" && responseId === "optimal") {
+      s.home.ToT = Math.min(3, s.home.ToT * 1.05);
+      s.log.push({ turn: s.turn, type: "policy", text: `⚖ Optimal retaliation against ${COUNTRIES[crisis.country].name} at t*=${(crisis.optimalTariff*100).toFixed(0)}%. ToT improved, welfare +2%.` });
+    } else if (crisis.type === "ai_tariff" && responseId === "aggressive") {
+      s.home.ToT = Math.min(3, s.home.ToT * 1.02);
+      s.log.push({ turn: s.turn, type: "policy", text: `⚔ Aggressive retaliation against ${COUNTRIES[crisis.country].name}. Escalation risk high. Relations severely damaged.` });
+    } else if (crisis.type === "ai_tariff" && responseId === "absorb") {
+      s.log.push({ turn: s.turn, type: "policy", text: `🕊 Absorbed tariff from ${COUNTRIES[crisis.country].name}. Welfare hit accepted, relations stabilized.` });
+    } else if (crisis.type === "currency_war" && responseId === "counter_depreciate") {
+      s.home.ToT = Math.min(3, s.home.ToT * 1.08);
+      s.log.push({ turn: s.turn, type: "policy", text: `💱 Counter-depreciated against ${COUNTRIES[crisis.country].name}. ToT restored, but multilateral relations strained.` });
+      Object.keys(s.relations).forEach(c => { if (c !== crisis.country) s.relations[c] = Math.max(-100, s.relations[c] - 5); });
+    } else if (crisis.type === "currency_war" && responseId === "fta_offer") {
+      s.ftaPartners = [...(s.ftaPartners || []), crisis.country];
+      s.home.varieties = Math.round(s.home.varieties * 1.1);
+      s.log.push({ turn: s.turn, type: "policy", text: `🤝 FTA offered and accepted by ${COUNTRIES[crisis.country].name} to end currency war. Varieties +10%.` });
+    } else if (crisis.type === "sanctions_coalition" && responseId === "diplomacy") {
+      s.trade[crisis.country] = Math.round((s.trade[crisis.country] || 0) + 10);
+      s.log.push({ turn: s.turn, type: "policy", text: `🕊 Diplomatic concessions broke the coalition. Trade with ${COUNTRIES[crisis.country].name} partially restored.` });
+    } else if (crisis.type === "sanctions_coalition" && responseId === "retaliate") {
+      s.trade[crisis.country] = 0;
+      s.log.push({ turn: s.turn, type: "policy", text: `🔒 Counter-sanctioned ${COUNTRIES[crisis.country].name}. Trade war deepens.` });
+    } else {
+      s.log.push({ turn: s.turn, type: "policy", text: `⚖ Third-party mediation engaged for ${COUNTRIES[crisis.country].name} crisis.` });
+    }
+
+    // Mark crisis resolved
+    s.crises = s.crises.map(cr => cr.id === crisis.id ? { ...cr, resolved: true } : cr);
+    setState(s);
+  };
+
+  // Game screen — check for pending crises first
+  const pendingCrisis = (state.crises || []).find(cr => !cr.resolved);
   const isBriefing = state.phase === "brief";
 
   return (
@@ -914,6 +1235,7 @@ export default function EconomicStatecraft() {
           <span style={{ fontFamily: mono, fontSize: "0.65rem", color: C.dim }}>Turn {state.turn}/{TOTAL_TURNS}</span>
         </div>
         <div style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
+          {pendingCrisis && <span style={{ fontFamily: mono, fontSize: "0.65rem", color: "#e87f7f", animation: "pulse 1s infinite" }}>⚡ CRISIS PENDING</span>}
           <span style={{ fontFamily: mono, fontSize: "0.7rem", color: getWelfareRating(state.home.welfare).color }}>
             ◆ Welfare: {state.home.welfare}
           </span>
@@ -923,9 +1245,11 @@ export default function EconomicStatecraft() {
         </div>
       </div>
 
-      {isBriefing
-        ? <BriefingScreen state={state} onContinue={() => setState(s => ({ ...s, phase: "action" }))} />
-        : <ActionScreen state={state} onAction={handleAction} onEndTurn={handleEndTurn} />
+      {pendingCrisis
+        ? <CrisisScreen crisis={pendingCrisis} state={state} onRespond={handleCrisisResponse} />
+        : isBriefing
+          ? <BriefingScreen state={state} onContinue={() => setState(s => ({ ...s, phase: "action" }))} />
+          : <ActionScreen state={state} onAction={handleAction} onEndTurn={handleEndTurn} />
       }
     </div>
   );
