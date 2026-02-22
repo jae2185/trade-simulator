@@ -219,7 +219,7 @@ function QuizMode({ model, answers }) {
     { id: "prodShift",  label: "When ToT rises, the production point shifts toward:", options: ["More X, less Y", "More Y, less X", "No change — PPF is fixed"] },
     { id: "gainDecomp", label: "The Standard Model decomposes gains from trade into:", options: ["Production gain + exchange gain", "Factor gain + variety gain", "Absolute advantage + comparative advantage"] },
     { id: "ppfShape",   label: "A bowed-out PPF (vs. linear) implies:", options: ["Increasing opportunity costs", "Constant opportunity costs", "Decreasing opportunity costs"] },
-  ] : [
+  ] : [];
 
   const score = revealed ? questions.filter(q => guesses[q.id] === answers[q.id]).length : 0;
 
