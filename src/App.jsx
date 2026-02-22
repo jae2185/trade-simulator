@@ -287,106 +287,76 @@ function QuizMode({ model, answers }) {
   );
 }
 
-// ─── AI EXPLAIN BUTTON ────────────────────────────────────────────────────────
+// ─── STATIC EXPLAIN PANEL ─────────────────────────────────────────────────────
 
 function ExplainButton({ model, params, results }) {
-  const [status, setStatus] = useState("idle"); // idle | loading | done | error
-  const [explanation, setExplanation] = useState("");
+  const [open, setOpen] = useState(false);
   const mono = "'IBM Plex Mono', monospace";
-  const gold = "#e2c97e";
   const blue = "#4a9fe8";
   const dim = "#3a5a7a";
-  const green = "#7fe87f";
-  const red = "#e87f7f";
 
-  const MODEL_CONTEXT = {
-    ricardian: "the Ricardian model of comparative advantage (Ricardo 1817). Key concepts: labor productivity ratios, opportunity costs, wage ratio bounds, specialization pattern.",
-    ho: "the Heckscher-Ohlin model of factor endowments (Heckscher 1919, Ohlin 1933). Key concepts: H-O theorem, Stolper-Samuelson, Rybczynski, factor price equalization.",
-    standard: "the Standard Trade Model (Krugman & Obstfeld). Key concepts: bowed-out PPF, terms of trade, production and consumption points, welfare decomposition into production gain + exchange gain.",
-    krugman: "Krugman's New Trade Theory (1980). Key concepts: monopolistic competition, love of variety, increasing returns, home market effect, intra-industry trade.",
-    melitz: "the Melitz model of firm heterogeneity (2003). Key concepts: Pareto productivity distribution, survival cutoff φ*, export cutoff φ_x*, between-firm reallocation, exporter productivity premium.",
-  };
-
-  const handleExplain = async () => {
-    setStatus("loading");
-    setExplanation("");
-    const paramStr = Object.entries(params).map(([k, v]) => `${k}=${typeof v === "number" ? v.toFixed(2) : v}`).join(", ");
-    const resultStr = Object.entries(results).map(([k, v]) => `${k}=${typeof v === "number" ? v.toFixed(2) : v}`).join(", ");
-    const prompt = `You are a graduate economics teaching assistant explaining ${MODEL_CONTEXT[model]}
-
-Current parameter values: ${paramStr}
-Current model outputs: ${resultStr}
-
-In 3-4 sentences of plain English (no LaTeX, no bullet points), explain what these specific numbers mean economically. What is the key insight this configuration illustrates? What would change if the student increased the most interesting parameter?`;
-
-    try {
-      const res = await fetch("/api/explain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setExplanation(`API error ${res.status}: ${JSON.stringify(data).slice(0, 200)}`);
-        setStatus("error");
-        return;
-      }
-      const text = data.content?.map(b => b.text || "").join("") || "";
-      if (!text) throw new Error("empty response");
-      setExplanation(text);
-      setStatus("done");
-    } catch (err) {
-      setExplanation(err.message || "Unknown error");
-      setStatus("error");
+  const explain = () => {
+    if (model === "ricardian") {
+      const { homeCA, forCA, tradeExists, wageLo, wageHi } = results;
+      if (!tradeExists) return "Both countries have identical relative productivities — there is no comparative advantage difference and therefore no incentive to trade. Try adjusting the labor coefficients so that the ratio a_LC/a_LW differs between Home and Foreign.";
+      return `Home has a comparative advantage in ${homeCA} because its opportunity cost of producing ${homeCA} is lower than Foreign's — not necessarily because it is more productive in absolute terms. This means both countries gain from specialization even if one is more efficient at everything. The valid range for the wage ratio w/w* is [${wageLo}, ${wageHi}]: any wage ratio within this range supports a trade equilibrium where Home specializes in ${homeCA} and Foreign in ${forCA}. If you narrow this range by making productivities more similar, the gains from trade shrink; if you widen it, the gains are larger and specialization is more complete.`;
     }
+
+    if (model === "ho") {
+      const { homeExports, homeWinner, homeLoser, homeKL, foreignKL } = results;
+      const abundant = parseFloat(homeKL) > parseFloat(foreignKL) ? "capital" : "labor";
+      return `Home's K/L ratio (${homeKL}) is ${parseFloat(homeKL) > parseFloat(foreignKL) ? "higher" : "lower"} than Foreign's (${foreignKL}), making Home ${abundant}-abundant. The H-O theorem predicts Home exports ${homeExports} — the good that uses ${abundant} intensively. Opening to trade raises the real return to the abundant factor: ${homeWinner}. The scarce factor loses: ${homeLoser}. This is the Stolper-Samuelson theorem — trade liberalization has sharp distributional consequences even when aggregate welfare rises. Try increasing the K/L gap between countries to see specialization become more extreme.`;
+    }
+
+    if (model === "standard") {
+      const { prodX, prodY, exports: exp, prodGain, exchGain, welfareGainPct } = results;
+      const tot = params.ToT;
+      if (tot === 1.0 || parseFloat(exp) < 0.5) return "At ToT = 1 (autarky prices), there is no incentive to trade — the world price equals the domestic opportunity cost. Raise the Terms of Trade slider above 1 to make Good X more valuable internationally, shifting the production point toward X and creating an exchange gain.";
+      const dominant = parseFloat(prodGain) > parseFloat(exchGain) ? "production" : "exchange";
+      return `With ToT = ${tot.toFixed(2)}, Home produces at (${prodX}, ${prodY}) — shifted toward Good X relative to autarky — and trades to consume beyond the PPF. The welfare gain of ${welfareGainPct} decomposes into a production gain (${prodGain}: reallocating toward the now-more-valuable export good) and an exchange gain (${exchGain}: buying imports cheaply relative to export revenues). The ${dominant} gain dominates here. A ${tot > 2 ? "further ToT increase would amplify both gains, but also increase exposure to a terms-of-trade reversal" : "higher ToT would increase both gains as production reallocates further toward X"}.`;
+    }
+
+    if (model === "krugman") {
+      const { nHome, nFor, nWorld, pTrade, varietyGain } = results;
+      const larger = parseFloat(nHome) > parseFloat(nFor) ? "Home" : "Foreign";
+      return `In the Krugman model, market size drives variety: Home autarky supports ${nHome} varieties, Foreign ${nFor}, but integrated world trade supports ${nWorld} — a gain of ${varietyGain} varieties that neither country could sustain alone. The trade price ${pTrade} is lower than the autarky price because each firm spreads fixed costs over a larger market. ${larger} is the larger economy and exports the differentiated good in net terms (the Home Market Effect). Consumers in both countries gain access to all ${nWorld} varieties. Lowering the fixed cost F would increase variety even further; raising it concentrates production.`;
+    }
+
+    if (model === "melitz") {
+      const { exportShare, phiXCutoff, avgProdExporter, welfareGain } = results;
+      return `Only the most productive firms export: the export productivity cutoff φ_x* = ${phiXCutoff} means a firm must be ${phiXCutoff}× more productive than the minimum survivor to profitably pay the fixed export cost. This selects ${exportShare} of firms into exporting. Exporters average ${avgProdExporter}× the minimum productivity — this is why empirically, exporters are larger and more productive than non-exporters. When trade costs τ fall, φ_x* drops, more firms enter export markets, low-productivity domestic firms are crowded out, and aggregate productivity rises through reallocation. The welfare index here is ${welfareGain}: try lowering τ to see how liberalization raises this through the selection effect.`;
+    }
+
+    return "";
   };
+
+  const text = explain();
+  if (!text) return null;
 
   return (
     <div style={{ marginTop: "0.8rem" }}>
-      {status === "idle" && (
-        <button onClick={handleExplain} style={{
+      {!open ? (
+        <button onClick={() => setOpen(true)} style={{
           fontFamily: mono, fontSize: "0.65rem", padding: "0.45rem 1rem",
-          background: "rgba(74,159,232,0.08)", border: `1px solid ${blue}55`,
+          background: "rgba(74,159,232,0.06)", border: `1px solid ${blue}44`,
           color: blue, borderRadius: "2px", cursor: "pointer", letterSpacing: "0.06em",
-          transition: "all 0.15s", width: "100%",
+          width: "100%", textAlign: "left",
         }}>
           ⬡ EXPLAIN THIS RESULT
         </button>
-      )}
-      {status === "loading" && (
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, padding: "0.5rem",
-          background: "rgba(255,255,255,0.02)", border: "1px solid #1a2a3a", borderRadius: "2px",
-          textAlign: "center", letterSpacing: "0.08em" }}>
-          analyzing...
-        </div>
-      )}
-      {status === "error" && (
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: red, padding: "0.5rem",
-          background: "rgba(232,127,127,0.05)", border: "1px solid rgba(232,127,127,0.2)",
-          borderRadius: "2px", lineHeight: 1.6 }}>
-          <div style={{ marginBottom: "0.3rem" }}>⚠ Error — details below:</div>
-          <div style={{ fontSize: "0.6rem", color: "#8a9bb0", wordBreak: "break-all" }}>{explanation || "Unknown error"}</div>
-          <button onClick={() => { setStatus("idle"); setExplanation(""); }} style={{
-            fontFamily: mono, fontSize: "0.58rem", color: dim, background: "none",
-            border: "none", cursor: "pointer", padding: "0.3rem 0", letterSpacing: "0.06em",
-          }}>↺ retry</button>
-        </div>
-      )}
-      {status === "done" && (
-        <div style={{ background: "rgba(74,159,232,0.05)", border: `1px solid ${blue}33`,
-          borderLeft: `2px solid ${blue}`, borderRadius: "2px", padding: "0.7rem 0.9rem" }}>
-          <div style={{ fontFamily: mono, fontSize: "0.58rem", color: blue, letterSpacing: "0.1em", marginBottom: "0.5rem" }}>
-            ⬡ AI EXPLANATION
+      ) : (
+        <div style={{ background: "rgba(74,159,232,0.04)", border: `1px solid ${blue}2a`,
+          borderLeft: `2px solid ${blue}`, borderRadius: "2px", padding: "0.8rem 0.9rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.58rem", color: blue, letterSpacing: "0.1em", marginBottom: "0.6rem" }}>
+            ⬡ EXPLANATION
           </div>
-          <p style={{ fontFamily: mono, fontSize: "0.68rem", color: "#8a9bb0", lineHeight: 1.8, margin: "0 0 0.6rem" }}>
-            {explanation}
+          <p style={{ fontFamily: mono, fontSize: "0.68rem", color: "#8a9bb0", lineHeight: 1.9, margin: "0 0 0.6rem" }}>
+            {text}
           </p>
-          <button onClick={() => { setStatus("idle"); setExplanation(""); }} style={{
+          <button onClick={() => setOpen(false)} style={{
             fontFamily: mono, fontSize: "0.58rem", color: dim, background: "none",
             border: "none", cursor: "pointer", padding: 0, letterSpacing: "0.06em",
-          }}>↺ regenerate</button>
+          }}>▲ collapse</button>
         </div>
       )}
     </div>
