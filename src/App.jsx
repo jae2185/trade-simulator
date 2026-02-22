@@ -145,8 +145,8 @@ function AxesChart({ width = 280, height = 220, xLabel = "Good X", yLabel = "Goo
   const sx = v => (v / xMax) * W;
   const sy = v => H - (v / yMax) * H;
   return (
-    <div className="svg-scroll">
-    <svg width={width} height={height} style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+    <div className="svg-scroll" style={{ width: "100%" }}>
+    <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ fontFamily: "'IBM Plex Mono', monospace", display: "block" }}>
       <g transform={`translate(${pad.left},${pad.top})`}>
         {[0.25, 0.5, 0.75, 1].map(f => (
           <g key={f}>
@@ -324,7 +324,7 @@ function TradeVolume({ exports_, imports_, prodX, prodY, consX, consY, ToT, labe
         </div>
       ) : (
         <div className="svg-scroll">
-        <svg width={W} height={H} style={{ fontFamily: mono, display: "block", marginBottom: "0.5rem" }}>
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ fontFamily: mono, display: "block", marginBottom: "0.5rem" }}>
           <g transform={`translate(${pad.left},${pad.top})`}>
             <rect x={0} y={4} width={expW} height={cH-8} fill="rgba(74,159,232,0.25)" stroke={blue} strokeWidth={1.5} rx={2} />
             {expW > 40 && <text x={expW/2} y={cH/2+3} textAnchor="middle" fill={blue} fontSize={8} fontWeight={600}>
@@ -417,7 +417,6 @@ function RSCurve({ p, homeCA, hCloth, hWheat, fCloth, fWheat, homeRatio, forRati
   const pad = { top: 20, right: 20, bottom: 44, left: 52 };
   const cW = W - pad.left - pad.right;
   const cH = H - pad.top - pad.bottom;
-
   const pMax = pHi * 1.5;
   const rsMax = rs_mid * 2.2;
 
@@ -457,22 +456,22 @@ function RSCurve({ p, homeCA, hCloth, hWheat, fCloth, fWheat, homeRatio, forRati
       <div style={{ fontSize: "0.62rem", color: "#5a6a7a", marginBottom: "0.5rem", fontStyle: "italic", fontFamily: mono }}>
         x-axis: relative price P_cloth / P_wheat &nbsp;|&nbsp; y-axis: Q_cloth / Q_wheat (world)
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.6rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.6rem", flexWrap: "wrap" }}>
         <span style={{ fontFamily: mono, fontSize: "0.62rem", color: dim, whiteSpace: "nowrap" }}>
-          RD expenditure share on cloth (θ):
+          RD share (θ):
         </span>
         <input type="range" min={0.1} max={0.9} step={0.01} value={rdShare}
           onChange={e => setRdShare(parseFloat(e.target.value))}
-          style={{ accentColor: green, flex: 1, cursor: "pointer" }} />
+          style={{ accentColor: green, flex: 1, minWidth: 80, cursor: "pointer" }} />
         <span style={{ fontFamily: mono, fontSize: "0.72rem", color: green, fontWeight: 600, minWidth: 36 }}>
           {rdShare.toFixed(2)}
         </span>
-        <span style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>
-          → RD: P={`(${rdShare.toFixed(2)}/${(1-rdShare).toFixed(2)}) × (Q_w/Q_c)`}
+        <span className="rd-formula" style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>
+          → P={(` (${rdShare.toFixed(2)}/${(1-rdShare).toFixed(2)}) × (Q_w/Q_c)`)}
         </span>
       </div>
-      <div className="svg-scroll">
-      <svg width={W} height={H} style={{ fontFamily: mono, display: "block" }}>
+      <div style={{ width: "100%", maxWidth: W }}>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ fontFamily: mono, display: "block" }}>
         <g transform={`translate(${pad.left},${pad.top})`}>
           {/* Grid */}
           {[0.25, 0.5, 0.75, 1].map(f => (
@@ -614,7 +613,7 @@ function RSCurve({ p, homeCA, hCloth, hWheat, fCloth, fWheat, homeRatio, forRati
       </div>
 
       {/* Key values table */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", marginTop: "0.6rem" }}>
+      <div className="stat-grid-3" style={{ display: "grid", gap: "0.5rem", marginTop: "0.6rem" }}>
         {[
           { label: "Home autarky P", value: pLo.toFixed(2), color: blue },
           { label: "Equilibrium range", value: `[${pLo.toFixed(2)}, ${pHi.toFixed(2)}]`, color: gold },
@@ -698,7 +697,7 @@ function WageRatioCalc({ p, homeRatio, forRatio, wLo, wHi, tradeExists }) {
 
       {/* Number line SVG */}
       <div className="svg-scroll">
-      <svg width={W} height={H} style={{ fontFamily: mono, display: "block", marginBottom: "0.6rem" }}>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ fontFamily: mono, display: "block", marginBottom: "0.6rem" }}>
         <g transform={`translate(${pad.left},${pad.top})`}>
           {/* Base line */}
           <line x1={0} y1={30} x2={cW} y2={30} stroke="#2a3a4a" strokeWidth={2} />
@@ -1155,7 +1154,7 @@ function RybczynskiViz({ p }) {
 
       <div className="svg-scroll" style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
         {/* Chart */}
-        <svg width={W} height={H} style={{ fontFamily: mono, flexShrink: 0 }}>
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ fontFamily: mono, flexShrink: 0, minWidth: 180, maxWidth: W }}>
           <g transform={`translate(${pad.left},${pad.top})`}>
             {[0.25,0.5,0.75,1].map(f => (
               <g key={f}>
@@ -1341,7 +1340,7 @@ function FPEViz({ p }) {
       )}
 
       <div className="svg-scroll">
-      <svg width={W} height={H} style={{ fontFamily: mono, display: "block", marginBottom: "0.6rem" }}>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ fontFamily: mono, display: "block", marginBottom: "0.6rem" }}>
           {[0.5, 1].map(f => (
             <g key={f}>
               <line x1={0} y1={cH*(1-f)} x2={cW} y2={cH*(1-f)} stroke="rgba(255,255,255,0.04)" />
@@ -1374,7 +1373,7 @@ function FPEViz({ p }) {
       </svg>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.4rem" }}>
+      <div className="stat-grid-4" style={{ display: "grid", gap: "0.4rem" }}>
         {[
           { label: "w Home autarky", value: wHA.toFixed(3), color: blue },
           { label: "w Foreign autarky", value: wFA.toFixed(3), color: purple },
@@ -2240,7 +2239,6 @@ export default function App() {
         /* SVG scroll wrapper — lets fixed-width SVGs scroll on mobile */
         .svg-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
         .svg-scroll svg { display: block; }
-
         /* Game header */
         .game-header { padding: 0.7rem 2rem; flex-wrap: nowrap; gap: 1.5rem; }
         .game-header-left { gap: 1.5rem; }
@@ -2279,6 +2277,9 @@ export default function App() {
 
           /* Turn progress bar pips — smaller */
           .turn-pip { width: 18px !important; }
+
+          /* Hide verbose formula annotation on mobile */
+          .rd-formula { display: none !important; }
 
           /* Quiz buttons — full width on very narrow screens */
           .quiz-opt-btn { font-size: 0.6rem !important; padding: 0.3rem 0.5rem !important; }
