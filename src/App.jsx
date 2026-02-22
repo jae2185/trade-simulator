@@ -1341,6 +1341,9 @@ function FPEViz({ p }) {
 
       <div className="svg-scroll">
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ fontFamily: mono, display: "block", marginBottom: "0.6rem" }}>
+        <g transform={`translate(${pad.left},${pad.top})`}>
+          <line x1={0} y1={cH} x2={cW} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
+          <line x1={0} y1={0} x2={0} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
           {[0.5, 1].map(f => (
             <g key={f}>
               <line x1={0} y1={cH*(1-f)} x2={cW} y2={cH*(1-f)} stroke="rgba(255,255,255,0.04)" />
