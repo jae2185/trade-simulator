@@ -467,7 +467,7 @@ function RSCurve({ p, homeCA, hCloth, hWheat, fCloth, fWheat, homeRatio, forRati
           {rdShare.toFixed(2)}
         </span>
         <span className="rd-formula" style={{ fontFamily: mono, fontSize: "0.6rem", color: dim }}>
-          → P={(` (${rdShare.toFixed(2)}/${(1-rdShare).toFixed(2)}) × (Q_w/Q_c)`)}
+          {`→ P=(${rdShare.toFixed(2)}/${(1-rdShare).toFixed(2)}) × (Q_w/Q_c)`}
         </span>
       </div>
       <div style={{ width: "100%", maxWidth: W }}>
