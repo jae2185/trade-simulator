@@ -327,13 +327,18 @@ In 3-4 sentences of plain English (no LaTeX, no bullet points), explain what the
           messages: [{ role: "user", content: prompt }],
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (!res.ok) {
+        setExplanation(`API error ${res.status}: ${JSON.stringify(data).slice(0, 200)}`);
+        setStatus("error");
+        return;
+      }
       const text = data.content?.map(b => b.text || "").join("") || "";
-      if (!text) throw new Error("empty");
+      if (!text) throw new Error("empty response");
       setExplanation(text);
       setStatus("done");
-    } catch {
+    } catch (err) {
+      setExplanation(err.message || "Unknown error");
       setStatus("error");
     }
   };
@@ -358,8 +363,15 @@ In 3-4 sentences of plain English (no LaTeX, no bullet points), explain what the
         </div>
       )}
       {status === "error" && (
-        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: red, padding: "0.5rem" }}>
-          Failed to fetch explanation. Check your connection.
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: red, padding: "0.5rem",
+          background: "rgba(232,127,127,0.05)", border: "1px solid rgba(232,127,127,0.2)",
+          borderRadius: "2px", lineHeight: 1.6 }}>
+          <div style={{ marginBottom: "0.3rem" }}>⚠ Error — details below:</div>
+          <div style={{ fontSize: "0.6rem", color: "#8a9bb0", wordBreak: "break-all" }}>{explanation || "Unknown error"}</div>
+          <button onClick={() => { setStatus("idle"); setExplanation(""); }} style={{
+            fontFamily: mono, fontSize: "0.58rem", color: dim, background: "none",
+            border: "none", cursor: "pointer", padding: "0.3rem 0", letterSpacing: "0.06em",
+          }}>↺ retry</button>
         </div>
       )}
       {status === "done" && (
