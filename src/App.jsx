@@ -568,50 +568,66 @@ function RSCurve({ p, homeCA, hCloth, hWheat, fCloth, fWheat, homeRatio, forRati
             Relative Quantity (Q_cloth / Q_wheat)
           </text>
 
-          {/* X-axis ticks */}
-          {[{ v: pLo, label: `${pLo.toFixed(2)}`, sub: `(${clothCALabel} autarky)`, col: blue },
-            { v: pHi, label: `${pHi.toFixed(2)}`, sub: `(${wheatCALabel} autarky)`, col: purple }
-          ].map(({ v, label, sub, col }, i) => (
+          {/* X-axis ticks — offset labels to avoid overlap when pLo and P* are close */}
+          {[{ v: pLo, label: pLo.toFixed(2), sub: `${clothCALabel} autarky`, col: blue, anchor: "middle" },
+            { v: pHi, label: pHi.toFixed(2), sub: `${wheatCALabel} autarky`, col: purple, anchor: "middle" }
+          ].map(({ v, label, sub, col, anchor }, i) => (
             <g key={i}>
-              <line x1={sx(v)} y1={cH} x2={sx(v)} y2={cH + 4} stroke={col} />
-              <text x={sx(v)} y={cH + 14} textAnchor="middle" fill={col} fontSize={8}>{label}</text>
-              <text x={sx(v)} y={cH + 24} textAnchor="middle" fill={col} fontSize={7}>{sub}</text>
+              <line x1={sx(v)} y1={cH} x2={sx(v)} y2={cH + 5} stroke={col} strokeWidth={1} />
+              <text x={sx(v)} y={cH + 15} textAnchor={anchor} fill={col} fontSize={8.5}>{label}</text>
+              <text x={sx(v)} y={cH + 26} textAnchor={anchor} fill={col} fontSize={7}>{sub}</text>
             </g>
           ))}
 
           {/* Y-axis tick at rs_mid */}
-          <line x1={0} y1={sy(rs_mid)} x2={-4} y2={sy(rs_mid)} stroke={gold} />
-          <text x={-6} y={sy(rs_mid) + 3} textAnchor="end" fill={gold} fontSize={7.5}>{rs_mid.toFixed(2)}</text>
+          <line x1={0} y1={sy(rs_mid)} x2={-5} y2={sy(rs_mid)} stroke={gold} />
+          <text x={-8} y={sy(rs_mid) + 3} textAnchor="end" fill={gold} fontSize={8}>{rs_mid.toFixed(2)}</text>
 
           {/* ── RS CURVE ── */}
-          {/* Segment 1: vertical at pLo from 0 up to rs_mid (cloth-CA country specializes at pLo) */}
+          {/* Segment 1: vertical at pLo from bottom up to rs_mid */}
           <line x1={x1} y1={sy(0)} x2={x1} y2={sy(rs_mid)} stroke={gold} strokeWidth={2.5} />
           {/* Segment 2: flat at rs_mid from pLo to pHi */}
           <line x1={x1} y1={sy(rs_mid)} x2={x2} y2={sy(rs_mid)} stroke={gold} strokeWidth={2.5} />
-          {/* Segment 3: vertical at pHi going up (wheat-CA country switches to cloth) */}
+          {/* Segment 3: vertical at pHi going up */}
           <line x1={x2} y1={sy(rs_mid)} x2={x2} y2={sy(0)} stroke={gold} strokeWidth={2.5} />
 
-          {/* RS label */}
-          <text x={(x1 + x2) / 2} y={sy(rs_mid) - 8} textAnchor="middle" fill={gold} fontSize={7.5} fontWeight={600}>
-            RS = {rs_mid.toFixed(2)}
-          </text>
-
-          {/* Dashed vertical reference lines */}
-          <line x1={x1} y1={0} x2={x1} y2={cH} stroke={blue}   strokeWidth={1} strokeDasharray="3,3" opacity={0.3} />
-          <line x1={x2} y1={0} x2={x2} y2={cH} stroke={purple} strokeWidth={1} strokeDasharray="3,3" opacity={0.3} />
-
-          {/* Segment annotations */}
-          {x1 > 30 && (
-            <text x={x1 / 2} y={sy(rs_mid * 0.5)} textAnchor="middle" fill={blue} fontSize={7}>
-              {clothCALabel} not yet specializing
+          {/* RS = value label — above the flat segment, centered */}
+          {x2 - x1 > 20 && (
+            <text x={(x1 + x2) / 2} y={sy(rs_mid) - 10} textAnchor="middle" fill={gold} fontSize={8} fontWeight={600}>
+              RS = {rs_mid.toFixed(2)}
             </text>
           )}
-          <text x={(x1 + x2) / 2} y={sy(rs_mid * 1.55)} textAnchor="middle" fill={gold} fontSize={7}>
-            Both fully specialize
-          </text>
-          <text x={Math.min(x2 + 50, cW - 30)} y={sy(rs_mid * 1.55)} textAnchor="middle" fill={purple} fontSize={7}>
-            {wheatCALabel} switches to cloth
-          </text>
+
+          {/* Dashed vertical guides */}
+          <line x1={x1} y1={0} x2={x1} y2={cH} stroke={blue}   strokeWidth={1} strokeDasharray="3,3" opacity={0.25} />
+          <line x1={x2} y1={0} x2={x2} y2={cH} stroke={purple} strokeWidth={1} strokeDasharray="3,3" opacity={0.25} />
+
+          {/* Region annotations — placed in upper part of chart away from curves */}
+          {x1 > 40 && (
+            <text x={x1 / 2} y={14} textAnchor="middle" fill={blue} fontSize={7} opacity={0.8}>
+              {clothCALabel} not yet
+            </text>
+          )}
+          {x1 > 40 && (
+            <text x={x1 / 2} y={23} textAnchor="middle" fill={blue} fontSize={7} opacity={0.8}>
+              specializing
+            </text>
+          )}
+          {x2 - x1 > 30 && (
+            <text x={(x1 + x2) / 2} y={14} textAnchor="middle" fill={gold} fontSize={7} opacity={0.8}>
+              Both fully specialize
+            </text>
+          )}
+          {cW - x2 > 40 && (
+            <text x={Math.min(x2 + (cW - x2) / 2, cW - 4)} y={14} textAnchor="middle" fill={purple} fontSize={7} opacity={0.8}>
+              {wheatCALabel} switches
+            </text>
+          )}
+          {cW - x2 > 40 && (
+            <text x={Math.min(x2 + (cW - x2) / 2, cW - 4)} y={23} textAnchor="middle" fill={purple} fontSize={7} opacity={0.8}>
+              to cloth
+            </text>
+          )}
 
           {/* Corner dots */}
           {[[x1, sy(rs_mid)], [x2, sy(rs_mid)]].map(([cx, cy], i) => (
@@ -620,32 +636,41 @@ function RSCurve({ p, homeCA, hCloth, hWheat, fCloth, fWheat, homeRatio, forRati
 
           {/* ── RELATIVE DEMAND CURVE ── */}
           <polyline points={rdPts.join(" ")} fill="none" stroke={green} strokeWidth={2} opacity={0.85} strokeDasharray="5,3" />
-          <text x={sx(pMax * 0.82)} y={sy(rsMax * 0.08)} fill={green} fontSize={7.5}>RD</text>
+          {/* RD label — place at top-right where curve enters chart */}
+          <text x={cW - 4} y={sy(rsMax * 0.97)} textAnchor="end" fill={green} fontSize={7.5}>RD</text>
 
-          {/* Equilibrium */}
-          {inFlatRange && (
-            <>
-              <circle cx={sx(pEqVal)} cy={sy(rs_mid)} r={5} fill={green} opacity={0.9} />
-              <line x1={sx(pEqVal)} y1={sy(rs_mid)} x2={sx(pEqVal)} y2={cH} stroke={green} strokeWidth={1} strokeDasharray="3,2" opacity={0.5} />
-              <text x={sx(pEqVal)} y={cH + 14} textAnchor="middle" fill={green} fontSize={8} fontWeight="bold">
-                P*={pEqVal.toFixed(2)}
-              </text>
-            </>
-          )}
+          {/* Equilibrium — drop-line only if P* is meaningfully different from pLo/pHi */}
+          {inFlatRange && (() => {
+            const ex = sx(pEqVal);
+            const ey = sy(rs_mid);
+            // Offset P* label upward if it would collide with x-axis autarky labels
+            const tooCloseToPLo = Math.abs(pEqVal - pLo) / pMax * cW < 22;
+            const tooCloseToPHi = Math.abs(pEqVal - pHi) / pMax * cW < 22;
+            return (
+              <>
+                <circle cx={ex} cy={ey} r={5} fill={green} opacity={0.9} />
+                <line x1={ex} y1={ey} x2={ex} y2={cH} stroke={green} strokeWidth={1} strokeDasharray="3,2" opacity={0.4} />
+                {/* P* label: above the flat line if too close to autarky ticks below */}
+                <text x={ex} y={tooCloseToPLo || tooCloseToPHi ? ey - 14 : cH + 15}
+                  textAnchor="middle" fill={green} fontSize={8.5} fontWeight="bold">
+                  P*={pEqVal.toFixed(2)}
+                </text>
+              </>
+            );
+          })()}
           {inLowRange && (
             <>
-              {/* Eq is on rising segment — price is pLo, quantity determined by RD */}
-              <circle cx={x1} cy={sy(rdShare / ((1 - rdShare) * pLo))} r={5} fill={green} opacity={0.9} />
-              <text x={x1 - 4} y={sy(rdShare / ((1 - rdShare) * pLo)) - 8} textAnchor="end" fill={green} fontSize={7}>
-                P*=p_Lo (incomplete spec.)
+              <circle cx={x1} cy={sy(Math.min(rdShare / ((1 - rdShare) * pLo), rsMax * 0.95))} r={5} fill={green} opacity={0.9} />
+              <text x={x1 + 6} y={sy(Math.min(rdShare / ((1 - rdShare) * pLo), rsMax * 0.95)) - 6} fill={green} fontSize={7}>
+                P*=pLo
               </text>
             </>
           )}
           {inHighRange && (
             <>
-              <circle cx={x2} cy={sy(rdShare / ((1 - rdShare) * pHi))} r={5} fill={green} opacity={0.9} />
-              <text x={x2 + 4} y={sy(rdShare / ((1 - rdShare) * pHi)) - 8} fill={green} fontSize={7}>
-                P*=p_Hi (incomplete spec.)
+              <circle cx={x2} cy={sy(Math.min(rdShare / ((1 - rdShare) * pHi), rsMax * 0.95))} r={5} fill={green} opacity={0.9} />
+              <text x={x2 - 6} y={sy(Math.min(rdShare / ((1 - rdShare) * pHi), rsMax * 0.95)) - 6} textAnchor="end" fill={green} fontSize={7}>
+                P*=pHi
               </text>
             </>
           )}
