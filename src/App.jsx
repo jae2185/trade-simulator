@@ -201,6 +201,16 @@ function QuizMode({ model, answers }) {
     { id: "homeExports",  label: "Home exports:", options: ["Good X (capital-intensive)", "Good Y (labor-intensive)"] },
     { id: "winner",       label: "Stolper-Samuelson — Home gains:", options: ["Capital owners (r ↑)", "Workers (w ↑)"] },
     { id: "loser",        label: "Stolper-Samuelson — Home loses:", options: ["Capital owners (r ↓)", "Workers (w ↓)"] },
+  ] : model === "krugman" ? [
+    { id: "nEffect",   label: "When markets integrate, the number of available varieties:", options: ["Increases", "Decreases", "Stays the same"] },
+    { id: "pEffect",   label: "Trade integration causes prices to:", options: ["Rise (less competition)", "Fall (more competition)", "Unchanged"] },
+    { id: "hme",       label: "The Home Market Effect predicts the larger country:", options: ["Exports the differentiated good", "Imports the differentiated good", "Neither — trade is balanced"] },
+    { id: "welfare",   label: "Both countries gain from trade even if:", options: ["They have identical technologies", "One is larger", "One has no comparative advantage", "All of the above"] },
+  ] : model === "melitz" ? [
+    { id: "exporter",  label: "Which firms select into exporting?", options: ["Low-productivity firms", "High-productivity firms", "Randomly selected firms"] },
+    { id: "phiX",      label: "Lowering trade costs (τ) causes φ_x* to:", options: ["Rise (harder to export)", "Fall (easier to export)", "Stay the same"] },
+    { id: "reallocate", label: "Trade liberalization raises aggregate productivity via:", options: ["Within-firm learning", "Between-firm reallocation (low-φ firms exit)", "Government subsidy"] },
+    { id: "exporterSize", label: "Empirically, exporters are __ non-exporters:", options: ["Smaller than", "The same size as", "Larger and more productive than"] },
   ] : [
     { id: "exports",  label: "The country exports:", options: ["Good X", "Good Y", "Both goods", "Neither"] },
     { id: "totEffect", label: "Higher ToT (P_X/P_Y) causes welfare to:", options: ["Rise", "Fall", "Stay the same"] },
@@ -1216,14 +1226,15 @@ function RybczynskiViz({ p }) {
             <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, lineHeight: 1.7,
               background: "rgba(255,255,255,0.02)", padding: "0.5rem 0.6rem",
               borderRadius: "2px", borderLeft: `2px solid ${gold}` }}>
-              {dK > 0 && xCapInt && `K↑ → X expands (capital-intensive), Y contracts. Rybczynski theorem confirmed.`}
-              {dK > 0 && !xCapInt && `K↑ → Y expands (capital-intensive), X contracts. Rybczynski theorem confirmed.`}
-              {dK < 0 && xCapInt && `K↓ → X contracts (capital-intensive), Y expands.`}
-              {dK < 0 && !xCapInt && `K↓ → Y contracts (capital-intensive), X expands.`}
-              {dL > 0 && xCapInt && `L↑ → Y expands (labor-intensive), X contracts. Rybczynski theorem confirmed.`}
-              {dL > 0 && !xCapInt && `L↑ → X expands (labor-intensive), Y contracts. Rybczynski theorem confirmed.`}
-              {dL < 0 && xCapInt && `L↓ → Y contracts (labor-intensive), X expands.`}
-              {dL < 0 && !xCapInt && `L↓ → X contracts (labor-intensive), Y expands.`}
+              {(() => {
+                const capGood = xCapInt ? "X" : "Y";
+                const labGood = xCapInt ? "Y" : "X";
+                if (dK > 0) return `K↑ → ${capGood} expands (capital-intensive), ${labGood} contracts. Rybczynski theorem confirmed.`;
+                if (dK < 0) return `K↓ → ${capGood} contracts (capital-intensive), ${labGood} expands.`;
+                if (dL > 0) return `L↑ → ${labGood} expands (labor-intensive), ${capGood} contracts. Rybczynski theorem confirmed.`;
+                if (dL < 0) return `L↓ → ${labGood} contracts (labor-intensive), ${capGood} expands.`;
+                return null;
+              })()}
             </div>
           )}
         </div>
@@ -1854,6 +1865,14 @@ function KrugmanModel() {
               );
             }}
           </AxesChart>
+          <Collapsible title="Quiz Mode" accent="#e2c97e" defaultOpen={false}>
+            <QuizMode model="krugman" answers={{
+              nEffect: "Increases",
+              pEffect: "Fall (more competition)",
+              hme: "Exports the differentiated good",
+              welfare: "All of the above",
+            }} />
+          </Collapsible>
         </Panel>
       </div>
     </div>
@@ -1967,6 +1986,14 @@ function MelitzModel() {
               </div>
             ))}
           </div>
+          <Collapsible title="Quiz Mode" accent="#e2c97e" defaultOpen={false}>
+            <QuizMode model="melitz" answers={{
+              exporter: "High-productivity firms",
+              phiX: "Fall (easier to export)",
+              reallocate: "Between-firm reallocation (low-φ firms exit)",
+              exporterSize: "Larger and more productive than",
+            }} />
+          </Collapsible>
         </Panel>
       </div>
     </div>
