@@ -2089,7 +2089,7 @@ function MelitzModel() {
 
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
 
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 
 const MODELS = [
   { id: "ricardian", label: "Ricardian", subtitle: "Comparative Advantage", Component: RicardianModel },
@@ -2130,7 +2130,7 @@ function AboutPage() {
           An interactive implementation of the five canonical models of international trade theory — from Ricardo's 1817 comparative advantage framework through Melitz's 2003 heterogeneous-firms model. Built to support graduate coursework in international economics and to make abstract theory visually tractable.
         </p>
         <div style={{ display: "flex", gap: "0.8rem", flexWrap: "wrap" }}>
-          <a href="/" style={{
+          <a href="/models" style={{
             fontFamily: mono, fontSize: "0.72rem", letterSpacing: "0.08em",
             padding: "0.6rem 1.4rem", background: "none",
             border: `1px solid ${gold}`, color: gold, borderRadius: "2px", textDecoration: "none",
@@ -2237,9 +2237,9 @@ function Nav() {
           <div style={{ fontSize: "0.58rem", color: "#3a5a7a", letterSpacing: "0.15em", textTransform: "uppercase", fontFamily: "'IBM Plex Mono', monospace" }}>Economic Simulator</div>
         </div>
         <div className="nav-links" style={{ display: "flex", alignItems: "stretch" }}>
-          <Link to="/" style={linkStyle("/")}>MODELS</Link>
+          <Link to="/models" style={linkStyle("/models")}>MODELS</Link>
           <Link to="/game" style={linkStyle("/game")}>STATECRAFT ▸</Link>
-          <Link to="/about" style={linkStyle("/about")}>ABOUT</Link>
+          <Link to="/" style={linkStyle("/")}>ABOUT</Link>
         </div>
       </div>
       {/* Mobile hamburger */}
@@ -2254,7 +2254,7 @@ function Nav() {
           background: "#0d1520", borderBottom: "1px solid rgba(255,255,255,0.08)",
           display: "flex", flexDirection: "column", padding: "0.5rem 1.5rem 1rem",
         }}>
-          {[["/" , "MODELS"], ["/game", "STATECRAFT ▸"], ["/about", "ABOUT"]].map(([path, label]) => (
+          {[["/" , "ABOUT"], ["/models", "MODELS"], ["/game", "STATECRAFT ▸"]].map(([path, label]) => (
             <Link key={path} to={path} onClick={() => setMenuOpen(false)} style={{
               fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.8rem", color: loc.pathname === path ? "#e2c97e" : "#5a7a9a",
               padding: "0.7rem 0", borderBottom: "1px solid rgba(255,255,255,0.04)", textDecoration: "none",
@@ -2393,9 +2393,10 @@ export default function App() {
       `}</style>
       <Nav />
       <Routes>
-        <Route path="/" element={<SimulatorPage />} />
+        <Route path="/" element={<AboutPage />} />
+        <Route path="/models" element={<SimulatorPage />} />
         <Route path="/game" element={<EconomicStatecraft />} />
-        <Route path="/about" element={<AboutPage />} />
+        <Route path="/about" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );
