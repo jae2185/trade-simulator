@@ -861,8 +861,8 @@ function ManyGoodChain() {
   const axMax = Math.max(...sorted.map(g => g.ratio)) * 1.3;
 
   const addGood = () => {
-    if (newGood.name && newGood.aH > 0 && newGood.aF > 0) {
-      setGoods(prev => [...prev, { ...newGood }]);
+    if (newGood.name.trim() && newGood.aH > 0 && newGood.aF > 0) {
+      setGoods(prev => [...prev, { ...newGood, aH: Math.max(0.01, newGood.aH), aF: Math.max(0.01, newGood.aF) }]);
       setNewGood({ name: "", aH: 1, aF: 2 });
     }
   };
@@ -1232,8 +1232,8 @@ function RybczynskiViz({ p }) {
             ))}
             <line x1={0} y1={cH} x2={cW} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
             <line x1={0} y1={0} x2={0} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
-            <text x={cW/2} y={cH+28} textAnchor="middle" fill={dim} fontSize={9}>Good X (capital-intensive)</text>
-            <text x={-cH/2} y={-32} textAnchor="middle" fill={dim} fontSize={9} transform="rotate(-90)">Good Y (labor-intensive)</text>
+            <text x={cW/2} y={cH+28} textAnchor="middle" fill={dim} fontSize={9}>Good X ({xCapInt ? "capital" : "labor"}-intensive)</text>
+            <text x={-cH/2} y={-32} textAnchor="middle" fill={dim} fontSize={9} transform="rotate(-90)">Good Y ({xCapInt ? "labor" : "capital"}-intensive)</text>
             {[0,0.5,1].map(f => (
               <g key={f}>
                 <text x={sx(f*maxQ)} y={cH+12} textAnchor="middle" fill="#3a4a5a" fontSize={7.5}>{(f*maxQ).toFixed(0)}</text>
@@ -1600,36 +1600,43 @@ function StandardModel() {
   const autX = findTangent(1.0);
   const autY = ppf(autX);
 
-  // Income at trade prices
+  // Income at trade prices (value of production at world prices)
   const tradeIncome = prodX * p.ToT + prodY;
+  // Income the autarky point would earn at trade prices
   const autarkyAtTradePrices = autX * p.ToT + autY;
+  // Production gain: extra income from reallocating to export good at trade prices
   const prodGain = Math.max(0, tradeIncome - autarkyAtTradePrices);
 
-  // Consumption: interpolate between autarky point and the budget-line optimum.
-  // The trade "openness" parameter t ∈ [0,1] controls how far from autarky consumption moves.
-  // At t=0: consume at autarky point (no trade). At t=1: fully optimized on budget line.
-  // We set t based on how different ToT is from autarky price (=1):
-  // t = 1 - exp(-2 * |ToT - 1|), so t→0 as ToT→1, t→1 as ToT diverges
-  const t = 1 - Math.exp(-2 * Math.abs(p.ToT - 1));
-
-  // Direction of consumption shift: toward more Y (imports) when ToT > 1,
-  // toward more X when ToT < 1. But since X is the export good, when ToT > 1
-  // the country sells X and buys Y — so consX < prodX, consY > prodY.
-  // When ToT < 1, exporting X is less attractive, so consX > prodX (importing X).
-  // We enforce X as export good: consumption always has consX < prodX.
-  // Budget line: consX * ToT + consY = tradeIncome
-  // Optimal given X-export constraint: set consX = prodX * (1 - t * 0.3)
-  // then consY from budget constraint
-  const consX = Math.max(0, prodX * (1 - t * 0.35));
-  const consY = Math.min(tradeIncome - consX * p.ToT, p.size * 1.1);
+  // Consumption: Cobb-Douglas utility U = CX^0.5 * CY^0.5
+  // Tangency condition: CX/CY = PY/PX = 1/ToT
+  // Budget: CX*ToT + CY = tradeIncome
+  // Solving: CX = tradeIncome / (2*ToT), CY = tradeIncome / 2
+  const consX = Math.max(0, tradeIncome / (2 * p.ToT));
+  const consY = Math.min(tradeIncome / 2, p.size * 1.15);
 
   const exports_ = Math.max(0, prodX - consX);
   const imports_ = Math.max(0, consY - prodY);
 
-  const exchGain = Math.max(0, 0.5 * Math.abs(p.ToT - 1.0) * exports_);
-  const totalGain = prodGain + exchGain;
-  const autarkyIncome = autX + autY;
-  const welfareGainPct = (totalGain / autarkyIncome) * 100;
+  // Welfare: Cobb-Douglas utility U = sqrt(CX * CY)
+  // Autarky utility: U_aut = sqrt(autX * autY)
+  // Trade utility: U_trade = sqrt(consX * consY)
+  const U_aut   = Math.sqrt(autX * autY);
+  const U_trade = Math.sqrt(consX * consY);
+
+  // Production gain: utility if consuming at autarky bundle scaled to trade income
+  // i.e., what utility would the autarky point give at trade-income scale?
+  // = utility of (autarkyAtTradePrices/(2*ToT), autarkyAtTradePrices/2)
+  const U_prod = Math.sqrt((autarkyAtTradePrices / (2 * p.ToT)) * (autarkyAtTradePrices / 2));
+  const prodGainU  = Math.max(0, U_prod  - U_aut);
+  const exchGainU  = Math.max(0, U_trade - U_prod);
+  const totalGainU = U_trade - U_aut;
+
+  // Express as % utility gain relative to autarky
+  const welfareGainPct = U_aut > 0 ? ((U_trade - U_aut) / U_aut) * 100 : 0;
+  // For the stats panel, show income-equivalent gains (easier to interpret)
+  const prodGain = Math.max(0, autarkyAtTradePrices - (autX * p.ToT + autY));
+  const exchGain = Math.max(0, tradeIncome - autarkyAtTradePrices);
+  const totalGain = exchGain + prodGain;
 
   const nPts = 80;
   const ppfPoints = Array.from({ length: nPts + 1 }, (_, i) => ({ x: (i / nPts) * p.size, y: ppf((i / nPts) * p.size) }));
@@ -1667,9 +1674,9 @@ function StandardModel() {
           <div style={{ fontSize: "0.65rem", color: "#4a7fa5", letterSpacing: "0.08em", marginBottom: "0.6rem" }}>WELFARE DECOMPOSITION</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
             <Stat label="Production gain (income Δ)" value={prodGain.toFixed(2)} />
-            <Stat label="Exchange gain (price Δ)" value={exchGain.toFixed(2)} />
-            <Stat label="Total gain" value={totalGain.toFixed(2)} highlight />
-            <Stat label="% of autarky income" value={`${welfareGainPct.toFixed(1)}%`} highlight />
+            <Stat label="Exchange gain (income Δ)" value={exchGain.toFixed(2)} />
+            <Stat label="Total income gain" value={totalGain.toFixed(2)} highlight />
+            <Stat label="Utility gain vs autarky" value={`${welfareGainPct.toFixed(1)}%`} highlight />
           </div>
           <div style={{ fontSize: "0.7rem", color: "#5a7a5a", fontStyle: "italic", background: "rgba(90,160,90,0.06)", padding: "0.6rem", borderLeft: "2px solid #3a7a3a", marginTop: "0.6rem" }}>
             {p.ToT > 1.8 ? "Highly favorable ToT: large production reallocation gain and exchange gain." : p.ToT < 0.6 ? "Adverse ToT: export prices are low. Production gain may offset exchange loss — welfare gain is small." : "Moderate ToT: positive gains from both specialization and exchange."}
@@ -1706,47 +1713,35 @@ function StandardModel() {
               const blX1 = Math.min(blY0 / p.ToT, sMax);
               const blY1 = Math.max(0, blY0 - blX1 * p.ToT);
 
-              // Production gain triangle
+              // Production gain triangle: autarky → prod point (rectangular triangle)
               const triProd = [
                 `${sx(autX)},${sy(autY)}`,
                 `${sx(prodX)},${sy(autY)}`,
                 `${sx(prodX)},${sy(prodY)}`
               ].join(" ");
 
-              // Exchange gain triangle
+              // Exchange gain triangle: prod → consumption point (rectangular triangle)
               const triExch = [
                 `${sx(prodX)},${sy(prodY)}`,
                 `${sx(consX)},${sy(prodY)}`,
                 `${sx(consX)},${sy(consY)}`
               ].join(" ");
 
-              // Trade triangle: Production → corner → Consumption
-              const triTrade = [
-                `${sx(prodX)},${sy(prodY)}`,
-                `${sx(consX)},${sy(prodY)}`,
-                `${sx(consX)},${sy(consY)}`
-              ].join(" ");
-
-              // Indifference curve through consumption point (Cobb-Douglas: U = Cx^α * Cy^(1-α))
-              // At cons point: U = consX^0.5 * consY^0.5
-              // IC: y = U^2 / x = (consX * consY) / x
+              // Indifference curve through consumption point (Cobb-Douglas: U = CX^0.5 * CY^0.5)
+              // IC: CY = (U_trade)^2 / CX  where U_trade = sqrt(consX * consY)
               const U2 = consX * consY;
               const icPts = [];
-              for (let xi = 1; xi <= sMax; xi += sMax/120) {
+              for (let xi = 0.5; xi <= sMax; xi += sMax/120) {
                 const yi = U2 / xi;
-                if (yi >= 0 && yi <= sMax * 1.1) {
-                  icPts.push(`${sx(xi)},${sy(yi)}`);
-                }
+                if (yi >= 0 && yi <= sMax * 1.15) icPts.push(`${sx(xi)},${sy(yi)}`);
               }
 
-              // Autarky IC through autarky point
+              // Autarky IC
               const U2_aut = autX * autY;
               const icAutPts = [];
-              for (let xi = 1; xi <= sMax; xi += sMax/120) {
+              for (let xi = 0.5; xi <= sMax; xi += sMax/120) {
                 const yi = U2_aut / xi;
-                if (yi >= 0 && yi <= sMax * 1.1) {
-                  icAutPts.push(`${sx(xi)},${sy(yi)}`);
-                }
+                if (yi >= 0 && yi <= sMax * 1.15) icAutPts.push(`${sx(xi)},${sy(yi)}`);
               }
 
               // Arrow helper
@@ -1967,24 +1962,32 @@ function KrugmanModel() {
 // ─── 5. MELITZ MODEL ─────────────────────────────────────────────────────────
 
 const MELITZ_PRESETS = [
-  { id: "high_trade_costs", label: "High trade costs (pre-WTO era)", params: { tau: 2.2, fE: 8, fX: 6, theta: 3.5, L: 100 } },
-  { id: "low_trade_costs", label: "Low trade costs (post-WTO)", params: { tau: 1.3, fE: 8, fX: 6, theta: 3.5, L: 100 } },
-  { id: "high_dispersion", label: "High firm heterogeneity", params: { tau: 1.6, fE: 8, fX: 4, theta: 2, L: 100 } },
-  { id: "low_dispersion", label: "Low firm heterogeneity", params: { tau: 1.6, fE: 8, fX: 4, theta: 6, L: 100 } },
+  { id: "high_trade_costs", label: "High trade costs (pre-WTO era)", params: { tau: 2.2, fE: 8, fX: 6, theta: 3.5, sigma: 4, L: 100 } },
+  { id: "low_trade_costs", label: "Low trade costs (post-WTO)", params: { tau: 1.3, fE: 8, fX: 6, theta: 3.5, sigma: 4, L: 100 } },
+  { id: "high_dispersion", label: "High firm heterogeneity", params: { tau: 1.6, fE: 8, fX: 4, theta: 2, sigma: 4, L: 100 } },
+  { id: "low_dispersion", label: "Low firm heterogeneity", params: { tau: 1.6, fE: 8, fX: 4, theta: 6, sigma: 4, L: 100 } },
 ];
 
 function MelitzModel() {
-  const [p, setP] = useState({ tau: 1.6, fE: 8, fX: 4, theta: 3.5, L: 100 });
+  const [p, setP] = useState({ tau: 1.6, fE: 8, fX: 4, theta: 3.5, sigma: 4, L: 100 });
   const set = k => v => setP(prev => ({ ...prev, [k]: v }));
 
   const fD = 1;
-  const phiRatio = p.tau * Math.pow(p.fX / fD, 1 / p.theta);
-  const exportShare = Math.pow(1 / phiRatio, p.theta);
-  const avgProdDomestic = p.theta / (p.theta - 1);
+  // Export cutoff ratio: phi_x*/phi* = tau * (fX/fD)^(1/(sigma-1))
+  // In Melitz 2003: phi_x*/phi* = tau * (fX/fD)^(1/(sigma-1))
+  // theta is Pareto shape (governs productivity dispersion)
+  // sigma is elasticity of substitution (governs markup and selection)
+  const phiRatio = p.tau * Math.pow(p.fX / fD, 1 / (p.sigma - 1));
+  // Share of firms that export = (phi*/phi_x*)^theta = (1/phiRatio)^theta
+  const exportShare = Math.min(1, Math.pow(1 / phiRatio, p.theta));
+  // Average productivity of all active firms (Pareto mean above cutoff)
+  const avgProdDomestic = p.theta > 1 ? p.theta / (p.theta - 1) : Infinity;
+  // Average productivity of exporters = avgProdDomestic * phiRatio
   const avgProdExporter = avgProdDomestic * phiRatio;
-  const sigma = p.theta + 1;
-  const markupDomestic = sigma / (sigma - 1);
-  const welfareGain = Math.pow(exportShare, -1 / p.theta) * (1 / p.tau);
+  // Markup from CES: sigma/(sigma-1) — independent of theta
+  const markupDomestic = p.sigma / (p.sigma - 1);
+  // Welfare index (relative to autarky): lambda^(-1/theta) / tau
+  const welfareGain = Math.pow(Math.max(exportShare, 1e-9), -1 / p.theta) * (1 / p.tau);
 
   const phiMax = 6;
   const nBins = 60;
@@ -2013,6 +2016,7 @@ function MelitzModel() {
             if (preset) setP(preset.params);
           }} />
           <Slider label="τ (iceberg trade cost)" value={p.tau} min={1.01} max={3} step={0.05} onChange={set("tau")} desc="τ=1 is free trade. τ=2 means shipping 2 units to deliver 1." />
+          <Slider label="σ (elasticity of substitution)" value={p.sigma} min={2} max={10} step={0.5} onChange={set("sigma")} desc="Higher σ = more substitutable varieties, lower markup" />
           <Slider label="f_X (fixed export cost)" value={p.fX} min={1} max={20} step={0.5} onChange={set("fX")} desc="Fixed overhead to serve the foreign market" />
           <Slider label="f_E (entry cost)" value={p.fE} min={1} max={20} step={0.5} onChange={set("fE")} desc="Sunk cost of entering the domestic market" />
           <Slider label="θ (Pareto shape parameter)" value={p.theta} min={1.5} max={8} step={0.1} onChange={set("theta")} desc="Higher θ = less productivity dispersion across firms" />
