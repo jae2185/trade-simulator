@@ -213,11 +213,13 @@ function QuizMode({ model, answers }) {
     { id: "phiX",      label: "Lowering trade costs (τ) causes φ_x* to:", options: ["Rise (harder to export)", "Fall (easier to export)", "Stay the same"] },
     { id: "reallocate", label: "Trade liberalization raises aggregate productivity via:", options: ["Within-firm learning", "Between-firm reallocation (low-φ firms exit)", "Government subsidy"] },
     { id: "exporterSize", label: "Empirically, exporters are __ non-exporters:", options: ["Smaller than", "The same size as", "Larger and more productive than"] },
+  ] : model === "standard" ? [
+    { id: "exports",    label: "At the current ToT, the country exports:", options: ["Good X", "Good Y", "Neither (autarky)"] },
+    { id: "totWelfare", label: "A rise in ToT (P_X↑) causes national welfare to:", options: ["Rise", "Fall", "Unchanged — only distribution changes"] },
+    { id: "prodShift",  label: "When ToT rises, the production point shifts toward:", options: ["More X, less Y", "More Y, less X", "No change — PPF is fixed"] },
+    { id: "gainDecomp", label: "The Standard Model decomposes gains from trade into:", options: ["Production gain + exchange gain", "Factor gain + variety gain", "Absolute advantage + comparative advantage"] },
+    { id: "ppfShape",   label: "A bowed-out PPF (vs. linear) implies:", options: ["Increasing opportunity costs", "Constant opportunity costs", "Decreasing opportunity costs"] },
   ] : [
-    { id: "exports",  label: "The country exports:", options: ["Good X", "Good Y", "Both goods", "Neither"] },
-    { id: "totEffect", label: "Higher ToT (P_X/P_Y) causes welfare to:", options: ["Rise", "Fall", "Stay the same"] },
-    { id: "prodPoint", label: "With higher ToT, production shifts toward:", options: ["Good X (more)", "Good Y (more)", "No change"] },
-  ];
 
   const score = revealed ? questions.filter(q => guesses[q.id] === answers[q.id]).length : 0;
 
@@ -1616,9 +1618,11 @@ function StandardModel() {
           </Collapsible>
           <Collapsible title="Quiz Mode" accent="#e2c97e" defaultOpen={false}>
             <QuizMode model="standard" answers={{
-              exports: exports_ > imports_ ? "Good X" : "Good Y",
-              totEffect: "Rise",
-              prodPoint: "Good X (more)",
+              exports: exports_ > 0.5 ? "Good X" : "Neither (autarky)",
+              totWelfare: "Rise",
+              prodShift: "More X, less Y",
+              gainDecomp: "Production gain + exchange gain",
+              ppfShape: p.curvature > 1.1 ? "Increasing opportunity costs" : "Constant opportunity costs",
             }} />
           </Collapsible>
         </Panel>
