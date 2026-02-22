@@ -1604,39 +1604,28 @@ function StandardModel() {
   const tradeIncome = prodX * p.ToT + prodY;
   // Income the autarky point would earn at trade prices
   const autarkyAtTradePrices = autX * p.ToT + autY;
-  // Production gain: extra income from reallocating to export good at trade prices
-  const prodGain = Math.max(0, tradeIncome - autarkyAtTradePrices);
 
   // Consumption: Cobb-Douglas utility U = CX^0.5 * CY^0.5
-  // Tangency condition: CX/CY = PY/PX = 1/ToT
-  // Budget: CX*ToT + CY = tradeIncome
-  // Solving: CX = tradeIncome / (2*ToT), CY = tradeIncome / 2
+  // Tangency: CX/CY = 1/ToT, Budget: CX*ToT + CY = tradeIncome
+  // => CX = tradeIncome / (2*ToT), CY = tradeIncome / 2
   const consX = Math.max(0, tradeIncome / (2 * p.ToT));
   const consY = Math.min(tradeIncome / 2, p.size * 1.15);
 
   const exports_ = Math.max(0, prodX - consX);
   const imports_ = Math.max(0, consY - prodY);
 
-  // Welfare: Cobb-Douglas utility U = sqrt(CX * CY)
-  // Autarky utility: U_aut = sqrt(autX * autY)
-  // Trade utility: U_trade = sqrt(consX * consY)
+  // Welfare via Cobb-Douglas utility U = sqrt(CX * CY)
   const U_aut   = Math.sqrt(autX * autY);
   const U_trade = Math.sqrt(consX * consY);
-
-  // Production gain: utility if consuming at autarky bundle scaled to trade income
-  // i.e., what utility would the autarky point give at trade-income scale?
-  // = utility of (autarkyAtTradePrices/(2*ToT), autarkyAtTradePrices/2)
-  const U_prod = Math.sqrt((autarkyAtTradePrices / (2 * p.ToT)) * (autarkyAtTradePrices / 2));
-  const prodGainU  = Math.max(0, U_prod  - U_aut);
-  const exchGainU  = Math.max(0, U_trade - U_prod);
-  const totalGainU = U_trade - U_aut;
-
-  // Express as % utility gain relative to autarky
   const welfareGainPct = U_aut > 0 ? ((U_trade - U_aut) / U_aut) * 100 : 0;
-  // For the stats panel, show income-equivalent gains (easier to interpret)
-  const prodGain = Math.max(0, autarkyAtTradePrices - (autX * p.ToT + autY));
-  const exchGain = Math.max(0, tradeIncome - autarkyAtTradePrices);
-  const totalGain = exchGain + prodGain;
+
+  // Income-based decomposition for stats panel:
+  // Production gain: extra income from reallocating to the export good at world prices
+  const prodGain = Math.max(0, tradeIncome - autarkyAtTradePrices);
+  // Exchange gain: income the autarky bundle earns above its autarky value (= 0 by definition at autarky prices)
+  // Better: show export revenue as proxy for exchange gain
+  const exchGain = Math.max(0, exports_ * p.ToT - exports_);  // ToT premium on exports
+  const totalGain = prodGain + exchGain;
 
   const nPts = 80;
   const ppfPoints = Array.from({ length: nPts + 1 }, (_, i) => ({ x: (i / nPts) * p.size, y: ppf((i / nPts) * p.size) }));
