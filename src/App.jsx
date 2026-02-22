@@ -320,15 +320,14 @@ Current model outputs: ${resultStr}
 In 3-4 sentences of plain English (no LaTeX, no bullet points), explain what these specific numbers mean economically. What is the key insight this configuration illustrates? What would change if the student increased the most interesting parameter?`;
 
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
           messages: [{ role: "user", content: prompt }],
         }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const text = data.content?.map(b => b.text || "").join("") || "";
       if (!text) throw new Error("empty");
