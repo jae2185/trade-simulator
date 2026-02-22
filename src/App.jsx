@@ -1608,8 +1608,12 @@ function StandardModel() {
   // Consumption: Cobb-Douglas utility U = CX^0.5 * CY^0.5
   // Tangency: CX/CY = 1/ToT, Budget: CX*ToT + CY = tradeIncome
   // => CX = tradeIncome / (2*ToT), CY = tradeIncome / 2
-  const consX = Math.max(0, tradeIncome / (2 * p.ToT));
-  const consY = Math.min(tradeIncome / 2, p.size * 1.15);
+  // At ToT=1 (autarky), clamp consumption to production point so no phantom trade
+  const cdConsX = tradeIncome / (2 * p.ToT);
+  const cdConsY = tradeIncome / 2;
+  const atAutarky = Math.abs(p.ToT - 1.0) < 0.01;
+  const consX = atAutarky ? prodX : Math.max(0, cdConsX);
+  const consY = atAutarky ? prodY : Math.min(cdConsY, p.size * 1.15);
 
   const exports_ = Math.max(0, prodX - consX);
   const imports_ = Math.max(0, consY - prodY);
@@ -1619,12 +1623,11 @@ function StandardModel() {
   const U_trade = Math.sqrt(consX * consY);
   const welfareGainPct = U_aut > 0 ? ((U_trade - U_aut) / U_aut) * 100 : 0;
 
-  // Income-based decomposition for stats panel:
-  // Production gain: extra income from reallocating to the export good at world prices
+  // Income-based decomposition:
+  // Production gain: extra income from shifting production to export good at world prices
   const prodGain = Math.max(0, tradeIncome - autarkyAtTradePrices);
-  // Exchange gain: income the autarky bundle earns above its autarky value (= 0 by definition at autarky prices)
-  // Better: show export revenue as proxy for exchange gain
-  const exchGain = Math.max(0, exports_ * p.ToT - exports_);  // ToT premium on exports
+  // Exchange gain: ToT premium — exporting at price > 1 vs autarky price of 1
+  const exchGain = Math.max(0, exports_ * (p.ToT - 1));
   const totalGain = prodGain + exchGain;
 
   const nPts = 80;
