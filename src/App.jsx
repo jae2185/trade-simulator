@@ -145,6 +145,7 @@ function AxesChart({ width = 280, height = 220, xLabel = "Good X", yLabel = "Goo
   const sx = v => (v / xMax) * W;
   const sy = v => H - (v / yMax) * H;
   return (
+    <div className="svg-scroll">
     <svg width={width} height={height} style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
       <g transform={`translate(${pad.left},${pad.top})`}>
         {[0.25, 0.5, 0.75, 1].map(f => (
@@ -166,6 +167,7 @@ function AxesChart({ width = 280, height = 220, xLabel = "Good X", yLabel = "Goo
         {children({ sx, sy, W, H })}
       </g>
     </svg>
+    </div>
   );
 }
 
@@ -321,6 +323,7 @@ function TradeVolume({ exports_, imports_, prodX, prodY, consX, consY, ToT, labe
           No trade at current ToT (production = consumption). Adjust ToT away from autarky price to generate trade flows.
         </div>
       ) : (
+        <div className="svg-scroll">
         <svg width={W} height={H} style={{ fontFamily: mono, display: "block", marginBottom: "0.5rem" }}>
           <g transform={`translate(${pad.left},${pad.top})`}>
             <rect x={0} y={4} width={expW} height={cH-8} fill="rgba(74,159,232,0.25)" stroke={blue} strokeWidth={1.5} rx={2} />
@@ -333,6 +336,7 @@ function TradeVolume({ exports_, imports_, prodX, prodY, consX, consY, ToT, labe
             </text>}
           </g>
         </svg>
+        </div>
       )}
 
       {/* Stats grid */}
@@ -467,6 +471,7 @@ function RSCurve({ p, homeCA, hCloth, hWheat, fCloth, fWheat, homeRatio, forRati
           → RD: P={`(${rdShare.toFixed(2)}/${(1-rdShare).toFixed(2)}) × (Q_w/Q_c)`}
         </span>
       </div>
+      <div className="svg-scroll">
       <svg width={W} height={H} style={{ fontFamily: mono, display: "block" }}>
         <g transform={`translate(${pad.left},${pad.top})`}>
           {/* Grid */}
@@ -606,6 +611,7 @@ function RSCurve({ p, homeCA, hCloth, hWheat, fCloth, fWheat, homeRatio, forRati
           })()}
         </g>
       </svg>
+      </div>
 
       {/* Key values table */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem", marginTop: "0.6rem" }}>
@@ -691,6 +697,7 @@ function WageRatioCalc({ p, homeRatio, forRatio, wLo, wHi, tradeExists }) {
       </div>
 
       {/* Number line SVG */}
+      <div className="svg-scroll">
       <svg width={W} height={H} style={{ fontFamily: mono, display: "block", marginBottom: "0.6rem" }}>
         <g transform={`translate(${pad.left},${pad.top})`}>
           {/* Base line */}
@@ -718,6 +725,7 @@ function WageRatioCalc({ p, homeRatio, forRatio, wLo, wHi, tradeExists }) {
           <circle cx={sx(validWRatio)} cy={30} r={5} fill={gold} />
         </g>
       </svg>
+      </div>
 
       {/* Production pattern */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem", marginBottom: "0.6rem" }}>
@@ -1145,7 +1153,7 @@ function RybczynskiViz({ p }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+      <div className="svg-scroll" style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
         {/* Chart */}
         <svg width={W} height={H} style={{ fontFamily: mono, flexShrink: 0 }}>
           <g transform={`translate(${pad.left},${pad.top})`}>
@@ -1332,10 +1340,8 @@ function FPEViz({ p }) {
         </div>
       )}
 
+      <div className="svg-scroll">
       <svg width={W} height={H} style={{ fontFamily: mono, display: "block", marginBottom: "0.6rem" }}>
-        <g transform={`translate(${pad.left},${pad.top})`}>
-          <line x1={0} y1={cH} x2={cW} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
-          <line x1={0} y1={0} x2={0} y2={cH} stroke="#2a3a4a" strokeWidth={1.5} />
           {[0.5, 1].map(f => (
             <g key={f}>
               <line x1={0} y1={cH*(1-f)} x2={cW} y2={cH*(1-f)} stroke="rgba(255,255,255,0.04)" />
@@ -1366,6 +1372,7 @@ function FPEViz({ p }) {
           <text x={cW*0.75} y={-3} textAnchor="middle" fill={dim} fontSize={7}>— RETURNS TO CAPITAL (r) —</text>
         </g>
       </svg>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.4rem" }}>
         {[
@@ -2184,22 +2191,22 @@ function SimulatorPage() {
   const model = MODELS.find(m => m.id === active);
   return (
     <>
-      <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "0 2rem", overflowX: "auto" }}>
+      <div className="model-tab-bar" style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.05)", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         {MODELS.map(m => (
-          <button key={m.id} onClick={() => setActive(m.id)} style={{
+          <button key={m.id} onClick={() => setActive(m.id)} className="model-tab-btn" style={{
             background: "none", border: "none",
             borderBottom: `2px solid ${active === m.id ? "#e2c97e" : "transparent"}`,
-            padding: "0.9rem 1.4rem", cursor: "pointer",
+            cursor: "pointer",
             color: active === m.id ? "#e2c97e" : "#3a5a7a",
-            fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem",
-            letterSpacing: "0.04em", transition: "color 0.15s", whiteSpace: "nowrap"
+            fontFamily: "'IBM Plex Mono', monospace",
+            letterSpacing: "0.04em", transition: "color 0.15s", whiteSpace: "nowrap", flexShrink: 0,
           }}>
             <div>{m.label}</div>
-            <div style={{ fontSize: "0.58rem", color: active === m.id ? "#a09060" : "#2a3a4a", marginTop: "0.1rem" }}>{m.subtitle}</div>
+            <div className="model-tab-subtitle" style={{ fontSize: "0.58rem", color: active === m.id ? "#a09060" : "#2a3a4a", marginTop: "0.1rem" }}>{m.subtitle}</div>
           </button>
         ))}
       </div>
-      <div style={{ padding: "1.5rem 2rem", maxWidth: "980px", margin: "0 auto" }}>
+      <div className="sim-page-pad" style={{ maxWidth: "980px", margin: "0 auto" }}>
         <model.Component />
       </div>
     </>
@@ -2217,14 +2224,69 @@ export default function App() {
         * { box-sizing: border-box; }
         a { text-decoration: none; }
         ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #0d1520; } ::-webkit-scrollbar-thumb { background: #2a3a4a; }
+
+        /* Desktop defaults */
         .nav-links { display: flex !important; }
         .nav-hamburger { display: none !important; }
         .sim-grid { grid-template-columns: 1fr 1fr; }
+        .stat-grid-2 { grid-template-columns: 1fr 1fr; }
+        .stat-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .stat-grid-4 { grid-template-columns: repeat(4, 1fr); }
+        .sim-page-pad { padding: 1.5rem 2rem; }
+        .model-tab-bar { padding: 0 2rem; }
+        .model-tab-btn { padding: 0.9rem 1.4rem; font-size: 0.72rem; }
+        .model-tab-subtitle { display: block; }
+
+        /* SVG scroll wrapper — lets fixed-width SVGs scroll on mobile */
+        .svg-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+        .svg-scroll svg { display: block; }
+
+        /* Game header */
+        .game-header { padding: 0.7rem 2rem; flex-wrap: nowrap; gap: 1.5rem; }
+        .game-header-left { gap: 1.5rem; }
+        .game-header-right { gap: 1.5rem; }
+        .game-header-gdp { display: inline; }
+
         @media (max-width: 700px) {
           .nav-links { display: none !important; }
           .nav-hamburger { display: flex !important; }
+
+          /* Single-column layouts */
           .sim-grid { grid-template-columns: 1fr !important; }
           .about-tech-grid { grid-template-columns: 1fr !important; }
+
+          /* Tighter page padding */
+          .sim-page-pad { padding: 0.8rem 0.75rem !important; }
+
+          /* Stat grids — collapse to 2-col or 1-col */
+          .stat-grid-2 { grid-template-columns: 1fr 1fr !important; }
+          .stat-grid-3 { grid-template-columns: 1fr 1fr !important; }
+          .stat-grid-4 { grid-template-columns: 1fr 1fr !important; }
+
+          /* Model tab bar — horizontal scroll, tighter buttons */
+          .model-tab-bar { padding: 0 0.5rem !important; }
+          .model-tab-btn { padding: 0.75rem 0.75rem !important; font-size: 0.65rem !important; }
+          .model-tab-subtitle { display: none !important; }
+
+          /* Game header — stack vertically, trim GDP label */
+          .game-header { padding: 0.6rem 0.75rem !important; flex-wrap: wrap !important; gap: 0.5rem !important; }
+          .game-header-left { gap: 0.6rem !important; flex-wrap: wrap !important; }
+          .game-header-right { gap: 0.6rem !important; flex-wrap: wrap !important; }
+          .game-header-gdp { display: none !important; }
+
+          /* Panels — tighter internal padding */
+          .panel-inner { padding: 0.8rem 0.75rem !important; }
+
+          /* Turn progress bar pips — smaller */
+          .turn-pip { width: 18px !important; }
+
+          /* Quiz buttons — full width on very narrow screens */
+          .quiz-opt-btn { font-size: 0.6rem !important; padding: 0.3rem 0.5rem !important; }
+        }
+
+        @media (max-width: 420px) {
+          .stat-grid-2 { grid-template-columns: 1fr !important; }
+          .model-tab-btn { padding: 0.6rem 0.55rem !important; font-size: 0.6rem !important; }
         }
       `}</style>
       <Nav />

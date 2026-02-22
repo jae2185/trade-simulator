@@ -1530,22 +1530,22 @@ export default function EconomicStatecraft() {
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text }}>
       {/* Turn header */}
-      <div style={{ borderBottom: `1px solid ${C.border}`, padding: "0.7rem 2rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
+      <div className="game-header" style={{ borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="game-header-left" style={{ display: "flex", alignItems: "center" }}>
           <span style={{ fontFamily: mono, fontSize: "0.65rem", color: C.dim, letterSpacing: "0.1em" }}>YEAR {2024 + state.turn}</span>
           <div style={{ display: "flex", gap: "0.3rem" }}>
             {Array.from({ length: TOTAL_TURNS }).map((_, i) => (
-              <div key={i} style={{ width: 24, height: 4, borderRadius: 2, background: i < state.turn - 1 ? C.gold : i === state.turn - 1 ? C.blue : "#1a2a3a" }} />
+              <div key={i} className="turn-pip" style={{ width: 24, height: 4, borderRadius: 2, background: i < state.turn - 1 ? C.gold : i === state.turn - 1 ? C.blue : "#1a2a3a" }} />
             ))}
           </div>
           <span style={{ fontFamily: mono, fontSize: "0.65rem", color: C.dim }}>Turn {state.turn}/{TOTAL_TURNS}</span>
         </div>
-        <div style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
-          {pendingCrisis && <span style={{ fontFamily: mono, fontSize: "0.65rem", color: "#e87f7f", animation: "pulse 1s infinite" }}>⚡ CRISIS PENDING</span>}
+        <div className="game-header-right" style={{ display: "flex", alignItems: "center" }}>
+          {pendingCrisis && <span style={{ fontFamily: mono, fontSize: "0.65rem", color: "#e87f7f", animation: "pulse 1s infinite" }}>⚡ CRISIS</span>}
           <span style={{ fontFamily: mono, fontSize: "0.7rem", color: getWelfareRating(state.home.welfare).color }}>
             ◆ Welfare: {state.home.welfare}
           </span>
-          <span style={{ fontFamily: mono, fontSize: "0.7rem", color: C.dim }}>
+          <span className="game-header-gdp" style={{ fontFamily: mono, fontSize: "0.7rem", color: C.dim }}>
             GDP: {state.home.gdp}
           </span>
         </div>
