@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import EconomicStatecraft from "./EconomicStatecraft";
 
 // ─── Shared UI Components ────────────────────────────────────────────────────
@@ -283,6 +283,101 @@ function QuizMode({ model, answers }) {
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── AI EXPLAIN BUTTON ────────────────────────────────────────────────────────
+
+function ExplainButton({ model, params, results }) {
+  const [status, setStatus] = useState("idle"); // idle | loading | done | error
+  const [explanation, setExplanation] = useState("");
+  const mono = "'IBM Plex Mono', monospace";
+  const gold = "#e2c97e";
+  const blue = "#4a9fe8";
+  const dim = "#3a5a7a";
+  const green = "#7fe87f";
+  const red = "#e87f7f";
+
+  const MODEL_CONTEXT = {
+    ricardian: "the Ricardian model of comparative advantage (Ricardo 1817). Key concepts: labor productivity ratios, opportunity costs, wage ratio bounds, specialization pattern.",
+    ho: "the Heckscher-Ohlin model of factor endowments (Heckscher 1919, Ohlin 1933). Key concepts: H-O theorem, Stolper-Samuelson, Rybczynski, factor price equalization.",
+    standard: "the Standard Trade Model (Krugman & Obstfeld). Key concepts: bowed-out PPF, terms of trade, production and consumption points, welfare decomposition into production gain + exchange gain.",
+    krugman: "Krugman's New Trade Theory (1980). Key concepts: monopolistic competition, love of variety, increasing returns, home market effect, intra-industry trade.",
+    melitz: "the Melitz model of firm heterogeneity (2003). Key concepts: Pareto productivity distribution, survival cutoff φ*, export cutoff φ_x*, between-firm reallocation, exporter productivity premium.",
+  };
+
+  const handleExplain = async () => {
+    setStatus("loading");
+    setExplanation("");
+    const paramStr = Object.entries(params).map(([k, v]) => `${k}=${typeof v === "number" ? v.toFixed(2) : v}`).join(", ");
+    const resultStr = Object.entries(results).map(([k, v]) => `${k}=${typeof v === "number" ? v.toFixed(2) : v}`).join(", ");
+    const prompt = `You are a graduate economics teaching assistant explaining ${MODEL_CONTEXT[model]}
+
+Current parameter values: ${paramStr}
+Current model outputs: ${resultStr}
+
+In 3-4 sentences of plain English (no LaTeX, no bullet points), explain what these specific numbers mean economically. What is the key insight this configuration illustrates? What would change if the student increased the most interesting parameter?`;
+
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      const data = await res.json();
+      const text = data.content?.map(b => b.text || "").join("") || "";
+      if (!text) throw new Error("empty");
+      setExplanation(text);
+      setStatus("done");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  return (
+    <div style={{ marginTop: "0.8rem" }}>
+      {status === "idle" && (
+        <button onClick={handleExplain} style={{
+          fontFamily: mono, fontSize: "0.65rem", padding: "0.45rem 1rem",
+          background: "rgba(74,159,232,0.08)", border: `1px solid ${blue}55`,
+          color: blue, borderRadius: "2px", cursor: "pointer", letterSpacing: "0.06em",
+          transition: "all 0.15s", width: "100%",
+        }}>
+          ⬡ EXPLAIN THIS RESULT
+        </button>
+      )}
+      {status === "loading" && (
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: dim, padding: "0.5rem",
+          background: "rgba(255,255,255,0.02)", border: "1px solid #1a2a3a", borderRadius: "2px",
+          textAlign: "center", letterSpacing: "0.08em" }}>
+          analyzing...
+        </div>
+      )}
+      {status === "error" && (
+        <div style={{ fontFamily: mono, fontSize: "0.65rem", color: red, padding: "0.5rem" }}>
+          Failed to fetch explanation. Check your connection.
+        </div>
+      )}
+      {status === "done" && (
+        <div style={{ background: "rgba(74,159,232,0.05)", border: `1px solid ${blue}33`,
+          borderLeft: `2px solid ${blue}`, borderRadius: "2px", padding: "0.7rem 0.9rem" }}>
+          <div style={{ fontFamily: mono, fontSize: "0.58rem", color: blue, letterSpacing: "0.1em", marginBottom: "0.5rem" }}>
+            ⬡ AI EXPLANATION
+          </div>
+          <p style={{ fontFamily: mono, fontSize: "0.68rem", color: "#8a9bb0", lineHeight: 1.8, margin: "0 0 0.6rem" }}>
+            {explanation}
+          </p>
+          <button onClick={() => { setStatus("idle"); setExplanation(""); }} style={{
+            fontFamily: mono, fontSize: "0.58rem", color: dim, background: "none",
+            border: "none", cursor: "pointer", padding: 0, letterSpacing: "0.06em",
+          }}>↺ regenerate</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1054,6 +1149,8 @@ function RicardianModel() {
               wages: tradeExists ? "Rise in both countries" : "Unchanged",
             }} />
           </Collapsible>
+          <ExplainButton model="ricardian" params={p}
+            results={{ homeCA, forCA, wageLo: wLo.toFixed(2), wageHi: wHi.toFixed(2), tradeExists }} />
         </Panel>
       </div>
     </div>
@@ -1488,6 +1585,8 @@ function HOModel() {
               loser: homeLoser,
             }} />
           </Collapsible>
+          <ExplainButton model="ho" params={p}
+            results={{ homeKL: kH.toFixed(2), foreignKL: kF.toFixed(2), homeExports, homeWinner, homeLoser }} />
         </Panel>
       </div>
     </div>
@@ -1625,6 +1724,8 @@ function StandardModel() {
               ppfShape: p.curvature > 1.1 ? "Increasing opportunity costs" : "Constant opportunity costs",
             }} />
           </Collapsible>
+          <ExplainButton model="standard" params={p}
+            results={{ prodX: prodX.toFixed(1), prodY: prodY.toFixed(1), exports: exports_.toFixed(1), imports: imports_.toFixed(1), prodGain: prodGain.toFixed(2), exchGain: exchGain.toFixed(2), welfareGainPct: welfareGainPct.toFixed(1) + "%" }} />
         </Panel>
       </div>
       <div>
@@ -1886,6 +1987,8 @@ function KrugmanModel() {
               welfare: "All of the above",
             }} />
           </Collapsible>
+          <ExplainButton model="krugman" params={p}
+            results={{ nHome: nHome.toFixed(1), nFor: nFor.toFixed(1), nWorld: nWorld.toFixed(1), pTrade: pTrade.toFixed(3), varietyGain: (nWorld - Math.max(nHome, nFor)).toFixed(1) }} />
         </Panel>
       </div>
     </div>
@@ -2007,6 +2110,8 @@ function MelitzModel() {
               exporterSize: "Larger and more productive than",
             }} />
           </Collapsible>
+          <ExplainButton model="melitz" params={p}
+            results={{ exportShare: (exportShare * 100).toFixed(1) + "%", phiXCutoff: phiXCutoff.toFixed(2), avgProdExporter: avgProdExporter.toFixed(2), welfareGain: welfareGain.toFixed(3) }} />
         </Panel>
       </div>
     </div>
@@ -2193,13 +2298,33 @@ function Nav() {
 }
 
 function SimulatorPage() {
-  const [active, setActive] = useState("ricardian");
+  const getInitialModel = () => {
+    const hash = window.location.hash.replace("#", "");
+    return MODELS.find(m => m.id === hash) ? hash : "ricardian";
+  };
+  const [active, setActive] = useState(getInitialModel);
+
+  const switchModel = (id) => {
+    setActive(id);
+    window.history.replaceState(null, "", `/#${id}`);
+  };
+
+  // Sync on back/forward navigation
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (MODELS.find(m => m.id === hash)) setActive(hash);
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
   const model = MODELS.find(m => m.id === active);
   return (
     <>
       <div className="model-tab-bar" style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.05)", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         {MODELS.map(m => (
-          <button key={m.id} onClick={() => setActive(m.id)} className="model-tab-btn" style={{
+          <button key={m.id} onClick={() => switchModel(m.id)} className="model-tab-btn" style={{
             background: "none", border: "none",
             borderBottom: `2px solid ${active === m.id ? "#e2c97e" : "transparent"}`,
             cursor: "pointer",
